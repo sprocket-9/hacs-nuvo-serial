@@ -1,0 +1,95 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to the device",
+        "data": {
+          "port": "[%key:common::config_flow::data::port%]",
+          "type": "model"
+        }
+      },
+      "sources": {
+        "title": "Source Names",
+        "data": {
+          "source_1": "Name of source #1",
+          "source_2": "Name of source #2",
+          "source_3": "Name of source #3",
+          "source_4": "Name of source #4",
+          "source_5": "Name of source #5",
+          "source_6": "Name of source #6"
+        }
+      },
+      "zones": {
+        "title": "Zone Names",
+        "data": {
+          "zone_1": "Name of zone #1",
+          "zone_2": "Name of zone #2",
+          "zone_3": "Name of zone #3",
+          "zone_4": "Name of zone #4",
+          "zone_5": "Name of zone #5",
+          "zone_6": "Name of zone #6",
+          "zone_7": "Name of zone #7",
+          "zone_8": "Name of zone #8",
+          "zone_9": "Name of zone #9",
+          "zone_10": "Name of zone #10",
+          "zone_11": "Name of zone #11",
+          "zone_12": "Name of zone #12",
+          "zone_13": "Name of zone #13",
+          "zone_14": "Name of zone #14",
+          "zone_15": "Name of zone #15",
+          "zone_16": "Name of zone #16"
+        }
+      }
+    },
+    "error": {
+      "port": "Invalid port",
+      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
+      "unknown": "[%key:common::config_flow::error::unknown%]"
+    },
+    "abort": {
+      "model": "Incompatible model found",
+      "sources": "Unable to retrieve Source list",
+      "zones": "Unable to retrieve Zone list",
+      "port_in_use": "This Port is already in use",
+      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+    }
+  },
+  "options": {
+    "step": {
+      "sources": {
+        "title": "Configure sources",
+        "data": {
+          "source_1": "Name of source #1",
+          "source_2": "Name of source #2",
+          "source_3": "Name of source #3",
+          "source_4": "Name of source #4",
+          "source_5": "Name of source #5",
+          "source_6": "Name of source #6"
+        }
+      },
+      "port": {
+        "title": "Serial Port(change requires restart)",
+        "data": {
+          "port": "[%key:common::config_flow::data::port%]"
+        }
+      }
+    },
+    "error": {
+      "port": "Invalid port",
+      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]"
+    },
+    "abort": {
+      "port_in_use": "This Port is already in use",
+      "model": "Incompatible model found",
+      "sources": "Unable to retrieve Source list",
+      "zones": "Unable to retrieve Zone list"
+    }
+  },
+  "device_automation": {
+    "trigger_type": {
+      "keypad_play_pause": "{entity_name} keypad play/pause button pressed",
+      "keypad_prev": "{entity_name} keypad prev button pressed",
+      "keypad_next": "{entity_name} keypad next button pressed"
+    }
+  }
+}

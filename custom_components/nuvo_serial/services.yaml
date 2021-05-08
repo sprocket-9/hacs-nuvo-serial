@@ -1,0 +1,49 @@
+all_off:
+  name: All Off
+  description: Switch off all zones.
+
+page_on:
+  name: Page On
+  description: Activate Paging feature for all zones.
+
+page_off:
+  name: Page Off
+  description: Deactivate Paging feature, restoring all zone to pre-page state.
+
+snapshot:
+  description: Take a snapshot of the media player zone.
+  fields:
+    entity_id:
+      description: Name(s) of entities that will be snapshot. Platform dependent.
+      example: "media_player.living_room"
+
+restore:
+  description: Restore a snapshot of the media player zone.
+  fields:
+    entity_id:
+      description: Name(s) of entities that will be restored. Platform dependent.
+      example: "media_player.living_room"
+
+simulate_play_pause_button:
+  name: Keypad Play/Pause button
+  description: Simulate pressing zone keypad Play/Pause button.
+  fields:
+    entity_id:
+      description: Nuvo zone to send the button press from.
+      example: "media_player.living_room"
+
+simulate_prev_button:
+  name: Keypad Prev button
+  description: Simulate pressing zone keypad Prev button.
+  fields:
+    entity_id:
+      description: Nuvo zone to send the button press from.
+      example: "media_player.living_room"
+
+simulate_next_button:
+  name: Keypad Next button
+  description: Simulate pressing zone keypad Next button.
+  fields:
+    entity_id:
+      description: Nuvo zone to send the button press from.
+      example: "media_player.living_room"
