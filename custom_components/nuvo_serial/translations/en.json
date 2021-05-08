@@ -1,0 +1,95 @@
+{
+    "config": {
+        "abort": {
+            "already_configured": "Device is already configured",
+            "model": "Incompatible model found",
+            "port_in_use": "This Port is already in use",
+            "sources": "Unable to retrieve Source list",
+            "zones": "Unable to retrieve Zone list"
+        },
+        "error": {
+            "cannot_connect": "Failed to connect",
+            "port": "Invalid port",
+            "unknown": "Unexpected error"
+        },
+        "step": {
+            "sources": {
+                "data": {
+                    "source_1": "Name of source #1",
+                    "source_2": "Name of source #2",
+                    "source_3": "Name of source #3",
+                    "source_4": "Name of source #4",
+                    "source_5": "Name of source #5",
+                    "source_6": "Name of source #6"
+                },
+                "title": "Source Names"
+            },
+            "user": {
+                "data": {
+                    "port": "Port",
+                    "type": "model"
+                },
+                "title": "Connect to the device"
+            },
+            "zones": {
+                "data": {
+                    "zone_1": "Name of zone #1",
+                    "zone_10": "Name of zone #10",
+                    "zone_11": "Name of zone #11",
+                    "zone_12": "Name of zone #12",
+                    "zone_13": "Name of zone #13",
+                    "zone_14": "Name of zone #14",
+                    "zone_15": "Name of zone #15",
+                    "zone_16": "Name of zone #16",
+                    "zone_2": "Name of zone #2",
+                    "zone_3": "Name of zone #3",
+                    "zone_4": "Name of zone #4",
+                    "zone_5": "Name of zone #5",
+                    "zone_6": "Name of zone #6",
+                    "zone_7": "Name of zone #7",
+                    "zone_8": "Name of zone #8",
+                    "zone_9": "Name of zone #9"
+                },
+                "title": "Zone Names"
+            }
+        }
+    },
+    "device_automation": {
+        "trigger_type": {
+            "keypad_next": "{entity_name} keypad next button pressed",
+            "keypad_play_pause": "{entity_name} keypad play/pause button pressed",
+            "keypad_prev": "{entity_name} keypad prev button pressed"
+        }
+    },
+    "options": {
+        "abort": {
+            "model": "Incompatible model found",
+            "port_in_use": "This Port is already in use",
+            "sources": "Unable to retrieve Source list",
+            "zones": "Unable to retrieve Zone list"
+        },
+        "error": {
+            "cannot_connect": "Failed to connect",
+            "port": "Invalid port"
+        },
+        "step": {
+            "port": {
+                "data": {
+                    "port": "Port"
+                },
+                "title": "Serial Port(change requires restart)"
+            },
+            "sources": {
+                "data": {
+                    "source_1": "Name of source #1",
+                    "source_2": "Name of source #2",
+                    "source_3": "Name of source #3",
+                    "source_4": "Name of source #4",
+                    "source_5": "Name of source #5",
+                    "source_6": "Name of source #6"
+                },
+                "title": "Configure sources"
+            }
+        }
+    }
+}
