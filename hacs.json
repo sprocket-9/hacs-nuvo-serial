@@ -1,6 +1,5 @@
 {
   "name": "Nuvo multi-zone amplifier (serial)",
-  "content_in_root": false,
   "render_readme": true,
   "country": "EN",
   "domains": ["media_player", "number", "switch"],
