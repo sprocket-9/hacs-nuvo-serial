@@ -23,3 +23,19 @@ restore:
     entity_id:
       description: Name(s) of entities that will be restored. Platform dependent.
       example: "media_player.living_room"
+
+party_on:
+  name: Party On
+  description: Make the media player zone the party host.
+  fields:
+    entity_id:
+      description: Name of entity to make party host.
+      example: "media_player.living_room"
+
+party_off:
+  name: Party Off
+  description: Release the media player zone from being the party host.
+  fields:
+    entity_id:
+      description: Name of entity to make party host.
+      example: "media_player.living_room"

@@ -45,6 +45,8 @@ from .const import (
     GROUP_UNJOIN,
     KEYPAD_BUTTON_TO_EVENT,
     NUVO_OBJECT,
+    SERVICE_PARTY_OFF,
+    SERVICE_PARTY_ON,
     SERVICE_RESTORE,
     SERVICE_SNAPSHOT,
 )
@@ -108,6 +110,10 @@ async def async_setup_entry(
 
     platform.async_register_entity_service(SERVICE_SNAPSHOT, SERVICE_SCHEMA, "snapshot")
     platform.async_register_entity_service(SERVICE_RESTORE, SERVICE_SCHEMA, "restore")
+    platform.async_register_entity_service(SERVICE_PARTY_ON, SERVICE_SCHEMA, "party_on")
+    platform.async_register_entity_service(
+        SERVICE_PARTY_OFF, SERVICE_SCHEMA, "party_off"
+    )
 
 
 class NuvoZone(MediaPlayerEntity):
@@ -486,3 +492,11 @@ class NuvoZone(MediaPlayerEntity):
         """Service handler to restore zone's saved state."""
         if self._snapshot:
             await self._nuvo.restore_zone(self._snapshot)
+
+    async def party_on(self) -> None:
+        """Service call to make this zone the party host."""
+        await self._nuvo.set_party_host(self._zone_id, True)
+
+    async def party_off(self) -> None:
+        """Service call to release this zone from being the party host."""
+        await self._nuvo.set_party_host(self._zone_id, False)
