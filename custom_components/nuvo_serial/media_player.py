@@ -19,6 +19,10 @@ from homeassistant.components.media_player import MediaPlayerEntity
 from homeassistant.components.media_player.const import (
     DOMAIN as MP_DOMAIN,
     SUPPORT_GROUPING,
+    SUPPORT_NEXT_TRACK,
+    SUPPORT_PAUSE,
+    SUPPORT_PLAY,
+    SUPPORT_PREVIOUS_TRACK,
     SUPPORT_SELECT_SOURCE,
     SUPPORT_TURN_OFF,
     SUPPORT_TURN_ON,
@@ -42,9 +46,6 @@ from .const import (
     KEYPAD_BUTTON_TO_EVENT,
     NUVO_OBJECT,
     SERVICE_RESTORE,
-    SERVICE_SIMULATE_NEXT,
-    SERVICE_SIMULATE_PLAY_PAUSE,
-    SERVICE_SIMULATE_PREV,
     SERVICE_SNAPSHOT,
 )
 from .helpers import get_sources, get_zones
@@ -53,6 +54,10 @@ _LOGGER = logging.getLogger(__name__)
 
 SUPPORT_NUVO_SERIAL = (
     SUPPORT_GROUPING
+    | SUPPORT_NEXT_TRACK
+    | SUPPORT_PAUSE
+    | SUPPORT_PLAY
+    | SUPPORT_PREVIOUS_TRACK
     | SUPPORT_VOLUME_MUTE
     | SUPPORT_VOLUME_SET
     | SUPPORT_VOLUME_STEP
@@ -101,17 +106,8 @@ async def async_setup_entry(
 
     SERVICE_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTITY_ID): cv.entity_ids})
 
-    platform.async_register_entity_service(SERVICE_SNAPSHOT, SERVICE_SCHEMA, "snapshot")  # type: ignore
-    platform.async_register_entity_service(SERVICE_RESTORE, SERVICE_SCHEMA, "restore")  # type: ignore
-    platform.async_register_entity_service(
-        SERVICE_SIMULATE_PLAY_PAUSE, SERVICE_SCHEMA, "simulate_play_pause_button"
-    )
-    platform.async_register_entity_service(
-        SERVICE_SIMULATE_PREV, SERVICE_SCHEMA, "simulate_prev_button"
-    )
-    platform.async_register_entity_service(
-        SERVICE_SIMULATE_NEXT, SERVICE_SCHEMA, "simulate_next_button"
-    )
+    platform.async_register_entity_service(SERVICE_SNAPSHOT, SERVICE_SCHEMA, "snapshot")
+    platform.async_register_entity_service(SERVICE_RESTORE, SERVICE_SCHEMA, "restore")
 
 
 class NuvoZone(MediaPlayerEntity):
@@ -470,6 +466,18 @@ class NuvoZone(MediaPlayerEntity):
 
         return entity_id
 
+    async def async_media_play_pause(self):
+        """Play or pause the media player."""
+        await self._nuvo.zone_button_play_pause(self._zone_id)
+
+    async def async_media_next_track(self):
+        """Send next track command."""
+        await self._nuvo.zone_button_next(self._zone_id)
+
+    async def async_media_previous_track(self):
+        """Send previous track command."""
+        await self._nuvo.zone_button_prev(self._zone_id)
+
     async def snapshot(self) -> None:
         """Service handler to save zone's current state."""
         self._snapshot = await self._nuvo.zone_status(self._zone_id)
@@ -478,15 +486,3 @@ class NuvoZone(MediaPlayerEntity):
         """Service handler to restore zone's saved state."""
         if self._snapshot:
             await self._nuvo.restore_zone(self._snapshot)
-
-    async def simulate_play_pause_button(self) -> None:
-        """Service call to simulate pressing keypad play/pause button."""
-        await self._nuvo.zone_button_play_pause(self._zone_id)
-
-    async def simulate_prev_button(self) -> None:
-        """Service call to simulate pressing keypad prev button."""
-        await self._nuvo.zone_button_prev(self._zone_id)
-
-    async def simulate_next_button(self) -> None:
-        """Service call to simulate pressing keypad next button."""
-        await self._nuvo.zone_button_next(self._zone_id)
