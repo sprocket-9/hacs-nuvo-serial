@@ -17,6 +17,8 @@ import voluptuous as vol
 
 from homeassistant.components.media_player import MediaPlayerEntity
 from homeassistant.components.media_player.const import (
+    DOMAIN as MP_DOMAIN,
+    SUPPORT_GROUPING,
     SUPPORT_SELECT_SOURCE,
     SUPPORT_TURN_OFF,
     SUPPORT_TURN_ON,
@@ -26,14 +28,17 @@ from homeassistant.components.media_player.const import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_ENTITY_ID, CONF_TYPE, STATE_OFF, STATE_ON
+from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv, entity_platform
-from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.entity import DeviceInfo, Entity
 from homeassistant.helpers.typing import HomeAssistantType
 
 from .const import (
     CONF_VOLUME_STEP,
     DOMAIN,
     DOMAIN_EVENT,
+    GROUP_JOIN,
+    GROUP_UNJOIN,
     KEYPAD_BUTTON_TO_EVENT,
     NUVO_OBJECT,
     SERVICE_RESTORE,
@@ -47,7 +52,8 @@ from .helpers import get_sources, get_zones
 _LOGGER = logging.getLogger(__name__)
 
 SUPPORT_NUVO_SERIAL = (
-    SUPPORT_VOLUME_MUTE
+    SUPPORT_GROUPING
+    | SUPPORT_VOLUME_MUTE
     | SUPPORT_VOLUME_SET
     | SUPPORT_VOLUME_STEP
     | SUPPORT_TURN_ON
@@ -91,7 +97,7 @@ async def async_setup_entry(
 
     async_add_entities(entities, False)
 
-    platform = entity_platform.current_platform.get()
+    platform = entity_platform.async_get_current_platform()
 
     SERVICE_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTITY_ID): cv.entity_ids})
 
@@ -146,6 +152,8 @@ class NuvoZone(MediaPlayerEntity):
         self._volume: float | None
         self._source: str
         self._mute: bool
+        self._nuvo_group_members: list[str] = []
+        self._nuvo_group_id: int | None
 
     @property
     def should_poll(self) -> bool:
@@ -158,7 +166,7 @@ class NuvoZone(MediaPlayerEntity):
         return bool(self._state)
 
     @property
-    def device_info(self) -> dict[str, Any]:
+    def device_info(self) -> DeviceInfo:
         """Return device info for this device."""
         return {
             "identifiers": {(DOMAIN, self._namespace)},
@@ -188,7 +196,7 @@ class NuvoZone(MediaPlayerEntity):
         return self._state
 
     @property
-    def volume_level(self) -> float:
+    def volume_level(self) -> float | None:
         """Volume level of the media player (0..1)."""
         return self._volume
 
@@ -212,6 +220,11 @@ class NuvoZone(MediaPlayerEntity):
         """List of available input sources."""
         return self._source_names
 
+    @property
+    def group_members(self):
+        """List of members which are currently grouped together."""
+        return self._nuvo_group_members
+
     async def async_added_to_hass(self) -> None:
         """Run when entity is added to register.
 
@@ -223,6 +236,11 @@ class NuvoZone(MediaPlayerEntity):
         self._nuvo.add_subscriber(self._zone_button_callback, ZONE_BUTTON)
         await self._nuvo.zone_status(self._zone_id)
         await self._nuvo.zone_configuration(self._zone_id)
+
+        self.hass.bus.async_listen(
+            f"{DOMAIN}_group_changed", self._group_membership_changed
+        )
+        await self._async_get_group_members(update_state=False)
 
     async def async_will_remove_from_hass(self) -> None:
         """Run when entity is removed to register.
@@ -307,6 +325,7 @@ class NuvoZone(MediaPlayerEntity):
                 ],
             )
         )
+        self._nuvo_group_id = z_cfg.group
 
     async def async_select_source(self, source: str) -> None:
         """Set input source."""
@@ -380,6 +399,76 @@ class NuvoZone(MediaPlayerEntity):
                 rounding=ROUND_HALF_EVEN
             )
         )
+
+    async def async_join_players(self, group_members: list[str]):
+        """Join `group_members` as a player group with the current player."""
+
+        zone_mappings = {}
+        for entity_id in group_members:
+            z_state = self.hass.states.get(entity_id)
+            if z_state:
+                z_id = z_state.attributes.get("zone_id")
+                zone_mappings[entity_id] = z_id
+
+        if not self._nuvo_group_id or self._nuvo_group_id != GROUP_JOIN:
+            await self._nuvo.zone_join_group(self._zone_id, GROUP_JOIN)
+            self._nuvo_group_id = GROUP_JOIN
+
+        for entity_id, zone_id in zone_mappings.items():
+            # This will cause a ZoneConfiguration message to emit which the callback
+            # will update self._nuvo_group_id and update state
+            await self._nuvo.zone_join_group(zone_id, GROUP_JOIN)
+
+        self.hass.bus.async_fire(
+            f"{DOMAIN}_group_changed", {"group": self._nuvo_group_id}
+        )
+
+    async def async_unjoin_player(self):
+        """Remove this player from any group."""
+        await self._nuvo.zone_join_group(self._zone_id, GROUP_UNJOIN)
+        previous_group = self._nuvo_group_id
+        self._nuvo_group_id = GROUP_UNJOIN
+        self._nuvo_group_members = []
+        self.hass.bus.async_fire(f"{DOMAIN}_group_changed", {"group": previous_group})
+
+    @callback
+    def _group_membership_changed(self, event):
+        """Event callback when a zone's group settings have changed."""
+        if event.data["group"] == self._nuvo_group_id:
+            _LOGGER.debug(
+                "zone %d notified group %d has changed",
+                self._zone_id,
+                event.data["group"],
+            )
+            self.hass.async_create_task(
+                self._async_get_group_members(update_state=True)
+            )
+
+    async def _async_get_group_members(self, update_state: bool = False) -> None:
+        """Get the list of group members for this zone's group."""
+        _LOGGER.debug("zone %d Getting group members", self._zone_id)
+        member_entity_ids = []
+        group_member_zone_ids = await self._nuvo.zone_group_members(self._zone_id)
+        for z_id in group_member_zone_ids:
+            entity_id = await self._nuvo_zone_id_to_hass_entity_id(z_id)
+            if entity_id:
+                member_entity_ids.append(entity_id)
+
+        self._nuvo_group_members = member_entity_ids
+        if update_state:
+            self.async_schedule_update_ha_state()
+
+    async def _nuvo_zone_id_to_hass_entity_id(self, zone_id) -> str | None:
+        """Get the hass entity_id from the nuvo zone_id."""
+        mp_states = self.hass.states.async_all(MP_DOMAIN)
+        entity_id = None
+        for ent_state in mp_states:
+            z_id = ent_state.attributes.get("zone_id")
+            if z_id and z_id == zone_id:
+                entity_id = ent_state.entity_id
+                break
+
+        return entity_id
 
     async def snapshot(self) -> None:
         """Service handler to save zone's current state."""

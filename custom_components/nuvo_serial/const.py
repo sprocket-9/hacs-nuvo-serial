@@ -23,6 +23,9 @@ CONTROL_EQ_BALANCE = "balance"
 CONTROL_EQ_LOUDCMP = "loudcmp"
 CONTROL_SOURCE_GAIN = "gain"
 
+GROUP_JOIN = 4
+GROUP_UNJOIN = 0
+
 SERVICE_SNAPSHOT = "snapshot"
 SERVICE_RESTORE = "restore"
 SERVICE_PAGE_ON = "page_on"
