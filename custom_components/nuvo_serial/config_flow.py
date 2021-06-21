@@ -19,10 +19,10 @@ from homeassistant.config_entries import (
 )
 from homeassistant.const import CONF_PORT, CONF_TYPE
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import AbortFlow
+from homeassistant.data_entry_flow import AbortFlow, FlowResult
 from homeassistant.helpers.typing import HomeAssistantType
 
-from .const import CONF_SOURCES, CONF_ZONES, DOMAIN
+from .const import COMMAND_RESPONSE_TIMEOUT, CONF_SOURCES, CONF_ZONES, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -97,7 +97,7 @@ class NuvoConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
+    ) -> FlowResult:
         """Handle the initial step."""
 
         self._data: dict[str, Any] = {}
@@ -109,7 +109,9 @@ class NuvoConfigFlow(ConfigFlow, domain=DOMAIN):
 
             try:
                 self._nuvo = await get_nuvo_async(
-                    user_input[CONF_PORT], models[user_input[CONF_TYPE]]
+                    user_input[CONF_PORT],
+                    models[user_input[CONF_TYPE]],
+                    timeout=COMMAND_RESPONSE_TIMEOUT,
                 )
             except SerialException:
                 _LOGGER.exception("")
@@ -145,13 +147,13 @@ class NuvoConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
+    ) -> FlowResult:
         """Handle the initial step."""
         return await self.async_step_init(user_input)
 
     async def async_step_sources(
         self, user_input: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
+    ) -> FlowResult:
         """Handle Nuvo sources."""
 
         errors: dict[str, str] = {}
@@ -177,7 +179,7 @@ class NuvoConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_zones(
         self, user_input: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
+    ) -> FlowResult:
         """Handle Nuvo zones."""
 
         errors: dict[str, str] = {}
@@ -201,7 +203,7 @@ class NuvoConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def _create_entry(self) -> dict[str, Any]:
+    async def _create_entry(self) -> FlowResult:
         """Create device and entities."""
         await self._async_nuvo_disconnect()
         self._nuvo = None
@@ -268,13 +270,13 @@ class NuvoOptionsFlowHandler(OptionsFlow):
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
+    ) -> FlowResult:
         """Manage the options."""
         return await self.async_step_port()
 
     async def async_step_port(
         self, user_input: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
+    ) -> FlowResult:
         """Handle serial port change."""
 
         current_port = self.config_entry.data[CONF_PORT]
@@ -293,7 +295,9 @@ class NuvoOptionsFlowHandler(OptionsFlow):
                     raise AbortFlow("port_in_use")
                 try:
                     self._nuvo = await get_nuvo_async(
-                        _port, self.config_entry.data[CONF_TYPE]
+                        _port,
+                        self.config_entry.data[CONF_TYPE],
+                        timeout=COMMAND_RESPONSE_TIMEOUT,
                     )
                 except SerialException:
                     _LOGGER.exception("")
@@ -319,7 +323,7 @@ class NuvoOptionsFlowHandler(OptionsFlow):
 
     async def async_step_sources(
         self, user_input: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
+    ) -> FlowResult:
         """Handle Source changes."""
         if user_input is not None:
             self._data[CONF_SOURCES] = _idx_from_config(user_input)

@@ -10,6 +10,7 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.typing import ConfigType, HomeAssistantType, ServiceCallType
 
 from .const import (
+    COMMAND_RESPONSE_TIMEOUT,
     DOMAIN,
     NUVO_OBJECT,
     SERVICE_ALL_OFF,
@@ -35,7 +36,7 @@ async def async_setup_entry(hass: HomeAssistantType, entry: ConfigEntry) -> bool
     model = entry.data[CONF_TYPE]
 
     try:
-        nuvo = await get_nuvo_async(port, model)
+        nuvo = await get_nuvo_async(port, model, timeout=COMMAND_RESPONSE_TIMEOUT)
     except Exception as err:
         _LOGGER.error("Error connecting to Nuvo controller at %s", port)
         raise ConfigEntryNotReady from err
