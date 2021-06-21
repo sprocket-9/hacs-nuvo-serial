@@ -25,6 +25,7 @@ Source:
 * Gain control
 
 System:
+* Party Mode
 * Paging
 * Zones AllOff
 
@@ -42,9 +43,10 @@ Provide a way to send metadata or menus to zone keypads.
 Communication between the Nuvo and Home Assistant uses [Local Push](https://www.home-assistant.io/blog/2016/02/12/classifying-the-internet-of-things/) for state changes, meaning no polling of the Nuvo occurs, so the web interface is fast and responsive.  Also as the underlying library [nuvo-serial](https://pypi.org/project/nuvo-serial/) monitors the serial port for activity, any changes to the Nuvo made through zone keypads will be immediately reflected in Home Assistant.
 
 ## Connection
-Connection to the Nuvo amplifier is via the "Programming and Serial Control" RS-232 9-pin female connector, cabled direct to the device running Home Assistant.
+Connection to the Nuvo amplifier is via the "Programming and Serial Control" RS-232 9-pin female connector, either cabled direct to the device running Home Assistant or remotely over a network using a serial-to-network device.
 
-This needs a direct connection to the device running Home Assistant, either through a serial to serial cable if the device has a serial port, or a USB to RS-232 9-pin male cable.
+#### Direct
+Direct connection to the device running Home Assistant, either through a serial-to-serial cable if the device has a serial port, or a USB-to-RS-232 9-pin male cable.
 
 **NOTE** when using a usb to serial cable, the device name assigned e.g /dev/ttyUSB1 may change when the machine is rebooted and multiple devices on the USB bus are enumerated in a different order.  Obviously if this happens Home Assistant will be using the old device name for the serial port and will not be able to contact the Nuvo.  To prevent this it's a good idea to assign a fixed device name to the USB cable e.g. /dev/nuvo
 
@@ -57,6 +59,20 @@ It essentially comes to down to:
 * Add line: ```SUBSYSTEM=="tty", ATTRS{idVendor}=="067b", ATTRS{idProduct}=="2303", SYMLINK+="nuvo"```
 * Reboot, check for existence of ```/dev/nuvo```
 * Use ```/dev/nuvo``` as Port url in the Integration configuration
+
+#### Remote
+Connecting to the Nuvo over a network is possible using a hardware serial-to-network adapter or software such as [ser2net](https://linux.die.net/man/8/ser2net).
+
+The port url should then be in the form: ```socket://host:port```
+
+e.g.
+
+A possible ser2net configuration connecting TCP port 10003 to the nuvo device on /dev/ttyUSB1:
+
+```10003:raw:0:/dev/ttyUSB1:57600 8DATABITS NONE 1STOPBIT```
+
+Port URL: ```socket://192.168.5.1:10003```
+
 
 ## Installing
 
@@ -98,6 +114,12 @@ Activate Paging feature for all zones.  This uses the in-built Nuvo paging featu
 
 ### nuvo_serial.page_off
 Deactivate Paging feature, restoring all zone to pre-page state.
+
+### nuvo_serial.party_on
+Make the media player zone the party host.
+
+### nuvo_serial.party_off
+Release the media player zone from being the party host.
 
 ### nuvo_serial.snapshot
 Take a snapshot of the media player zone.  Useful for implementing a custom paging feature using automations.
