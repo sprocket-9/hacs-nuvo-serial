@@ -24,7 +24,6 @@ from homeassistant.components.media_player.const import (
     SUPPORT_TURN_ON,
     SUPPORT_VOLUME_MUTE,
     SUPPORT_VOLUME_SET,
-    SUPPORT_VOLUME_STEP,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_ENTITY_ID, CONF_TYPE, STATE_OFF, STATE_ON
@@ -56,7 +55,6 @@ SUPPORT_NUVO_SERIAL = (
     SUPPORT_GROUPING
     | SUPPORT_VOLUME_MUTE
     | SUPPORT_VOLUME_SET
-    | SUPPORT_VOLUME_STEP
     | SUPPORT_TURN_ON
     | SUPPORT_TURN_OFF
     | SUPPORT_SELECT_SOURCE
