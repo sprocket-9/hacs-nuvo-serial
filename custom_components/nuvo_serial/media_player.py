@@ -500,7 +500,7 @@ class NuvoZone(MediaPlayerEntity):
             controller_changed = True
             self._nuvo_group_controller = self.entity_id
 
-        if not self.group_id:
+        if not self.group_id or self.group_id != GROUP_MEMBER:
             _LOGGER.debug(
                 "GROUPING:JOIN:CONTROLLER_JOIN_GROUP Controller:zone %d %s/group:%d",
                 self._zone_id,
@@ -548,7 +548,7 @@ class NuvoZone(MediaPlayerEntity):
                 "GROUPING:JOIN:FIRE_JOIN_GROUP Controller:zone %d %s/group:%d/joiners: %s",
                 self._zone_id,
                 self.entity_id,
-                self.group_id,
+                GROUP_MEMBER,
                 zones_to_group,
             )
             for entity_id in zones_to_group:
@@ -556,7 +556,7 @@ class NuvoZone(MediaPlayerEntity):
                     f"{DOMAIN}_join_group",
                     {
                         "target_entity": entity_id,
-                        "group": self.group_id,
+                        "group": GROUP_MEMBER,
                         "group_controller": self.group_controller,
                         "source": self.source,
                         "volume": self.volume_level,
