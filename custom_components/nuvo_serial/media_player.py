@@ -575,6 +575,7 @@ class NuvoZone(MediaPlayerEntity):
             its own entity_id in the group_members, then async_unjoin_player to the
             previous group_controller zone.
             """
+            await self.async_turn_off()
             await self._disband_group()
         else:
             _LOGGER.debug(
@@ -584,7 +585,8 @@ class NuvoZone(MediaPlayerEntity):
                 self._zone_id,
                 self.entity_id,
             )
-            await self._nuvo.zone_join_group(self._zone_id, GROUP_NON_MEMBER)
+            await self._remove_from_nuvo_group(self._zone_id)
+            await self.async_turn_off()
 
     async def _disband_group(self):
         """Remove all zones from this zone's group."""
@@ -596,7 +598,11 @@ class NuvoZone(MediaPlayerEntity):
             self.group_members,
         )
         for zone_id in self._nuvo_group_members_zone_ids:
-            await self._nuvo.zone_join_group(zone_id, GROUP_NON_MEMBER)
+            await self._remove_from_nuvo_group(zone_id)
+
+    async def _remove_from_nuvo_group(self, zone_id: int):
+        """Remove zone_id from Nuvo group."""
+        await self._nuvo.zone_join_group(zone_id, GROUP_NON_MEMBER)
 
     async def _group_membership_changed_cb(self, event) -> None:
         """Event callback for a zone to retrieve its list of group members."""
