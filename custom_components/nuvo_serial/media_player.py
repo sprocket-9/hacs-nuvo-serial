@@ -619,6 +619,7 @@ class NuvoZone(MediaPlayerEntity):
             return
 
         self._nuvo_group_controller = event.data["group_controller"]
+        self._order_group_members()
 
         _LOGGER.debug(
             "GROUPING:EVENT:GROUP_CONTROLLER_CHANGE New Controller:zone %s/group:%d/this member zone:%d %s",
@@ -678,6 +679,7 @@ class NuvoZone(MediaPlayerEntity):
                 member_entity_ids.append(entity_id)
 
         self._nuvo_group_members = member_entity_ids
+        self._order_group_members()
         self._nuvo_group_members_zone_ids = group_member_zone_ids
         _LOGGER.debug(
             "GROUPING:GET_GROUP_MEMBERS for zone %d %s/found:%s",
@@ -685,6 +687,13 @@ class NuvoZone(MediaPlayerEntity):
             self.entity_id,
             self.group_members,
         )
+
+    def _order_group_members(self):
+        """Make the group_controller the first element in the list of group_members."""
+
+        if self.group_controller and self.group_controller in self._nuvo_group_members:
+            self._nuvo_group_members.remove(self.group_controller)
+            self._nuvo_group_members.insert(0, self.group_controller)
 
     async def _nuvo_zone_id_to_hass_entity_id(self, zone_id) -> str | None:
         """Get the hass entity_id from the nuvo zone_id."""
