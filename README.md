@@ -8,23 +8,29 @@ Auto discovers zone and source settings from a Nuvo Grand Concerto/Essentia G am
 
 Amplifier controls exposed:
 
-Zone:
-
+#### Zone:
 * On/Off
 * Mute
 * Volume
 * Source selection
 
-EQ:
+#### Zone EQ:
 * Bass control
 * Treble control
 * Speaker balance control
 * Loudness compensation control
 
-Source:
+#### Zone Volume:
+* Maximum volume level
+* Initial: volume level when a zone is powered on for the first time
+* Page: volume level when zone is in page mode
+* Party: volume level when zone is in party mode
+* Volume Reset: toggle to control whether a zone should always reset to Initial volume level at every power on
+
+#### Source:
 * Gain control
 
-System:
+#### System:
 * Party Mode
 * Paging
 * Zones AllOff
@@ -102,6 +108,11 @@ An Entity will now be created for each:
 | Zone bass | [Number](https://www.home-assistant.io/integrations/number/)
 | Zone treble | [Number](https://www.home-assistant.io/integrations/number/)
 | Zone loudness compensation | [Switch](https://www.home-assistant.io/integrations/switch/)
+| Zone Volume Max | [Number](https://www.home-assistant.io/integrations/number/)
+| Zone Volume Initial | [Number](https://www.home-assistant.io/integrations/number/)
+| Zone Volume Page | [Number](https://www.home-assistant.io/integrations/number/)
+| Zone Volume Party | [Number](https://www.home-assistant.io/integrations/number/)
+| Zone Volume Reset | [Switch](https://www.home-assistant.io/integrations/switch/)
 | Source Gain | [Number](https://www.home-assistant.io/integrations/number/)
 
 ## Services
@@ -173,10 +184,12 @@ input_boolean:
 ```
 
 Will create the entities:
-* input_boolean.office
-* input_boolean.kitchen
+```
+input_boolean.office
+input_boolean.kitchen
+```
 
-As shown the yaml section belowe, the [tap action](https://github.com/kalkih/mini-media-player#action-object-options) on each mini-media-player will call the input_boolean.toggle service.
+As shown the yaml section below, the [tap action](https://github.com/kalkih/mini-media-player#action-object-options) on each mini-media-player will call the input_boolean.toggle service.
 
 Example section in ui-lovelace.yaml:
 
@@ -200,7 +213,6 @@ views:
                   prev: true
                   next: true
                 icon: mdi:speaker-wireless
-                max_volume: 80
                 volume_stateless: true
                 tap_action:
                   action: call-service
@@ -212,7 +224,6 @@ views:
                 entity: media_player.office
                 full_row: true
                 step: 1
-                max: 80
                 hide_state: false
                 hide_when_off: true
 
@@ -252,6 +263,42 @@ views:
                   name: LoudComp
                   show_state: true
 
+                - type: custom:slider-entity-row
+                  entity: number.office_volume_max
+                  full_row: false
+                  name: Volume Max
+                  hide_state: false
+                  hide_when_off: true
+                  icon: mdi:tune
+
+                - type: custom:slider-entity-row
+                  entity: number.office_volume_initial
+                  full_row: false
+                  name: Volume Initial
+                  hide_state: false
+                  hide_when_off: true
+                  icon: mdi:tune
+
+                - type: custom:slider-entity-row
+                  entity: number.office_volume_page
+                  full_row: false
+                  name: Volume Page
+                  hide_state: false
+                  hide_when_off: true
+                  icon: mdi:tune
+
+                - type: custom:slider-entity-row
+                  entity: number.office_volume_party
+                  full_row: false
+                  name: Volume Party
+                  hide_state: false
+                  hide_when_off: true
+                  icon: mdi:tune
+
+                - entity: switch.office_volume_reset
+                  name: Volume Reset
+                  show_state: true
+
           - type: entities
             entities:
               - type: custom:mini-media-player
@@ -265,7 +312,6 @@ views:
                   prev: true
                   next: true
                 icon: mdi:speaker-wireless
-                max_volume: 80
                 volume_stateless: true
                 tap_action:
                   action: call-service
@@ -277,7 +323,6 @@ views:
                 entity: media_player.kitchen
                 full_row: true
                 step: 1
-                max: 80
                 hide_state: false
                 hide_when_off: true
 
@@ -315,6 +360,42 @@ views:
 
                 - entity: switch.kitchen_loudcmp
                   name: LoudComp
+                  show_state: true
+
+                - type: custom:slider-entity-row
+                  entity: number.kitchen_volume_max
+                  full_row: false
+                  name: Volume Max
+                  hide_state: false
+                  hide_when_off: true
+                  icon: mdi:tune
+
+                - type: custom:slider-entity-row
+                  entity: number.kitchen_volume_initial
+                  full_row: false
+                  name: Volume Initial
+                  hide_state: false
+                  hide_when_off: true
+                  icon: mdi:tune
+
+                - type: custom:slider-entity-row
+                  entity: number.kitchen_volume_page
+                  full_row: false
+                  name: Volume Page
+                  hide_state: false
+                  hide_when_off: true
+                  icon: mdi:tune
+
+                - type: custom:slider-entity-row
+                  entity: number.kitchen_volume_party
+                  full_row: false
+                  name: Volume Party
+                  hide_state: false
+                  hide_when_off: true
+                  icon: mdi:tune
+
+                - entity: switch.kitchen_volume_reset
+                  name: Volume Reset
                   show_state: true
 ```
 
