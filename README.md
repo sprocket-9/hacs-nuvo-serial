@@ -185,8 +185,8 @@ input_boolean:
 
 Will create the entities:
 ```
-input_boolean.office
-input_boolean.kitchen
+input_boolean.eq_office
+input_boolean.eq_kitchen
 ```
 
 As shown the yaml section below, the [tap action](https://github.com/kalkih/mini-media-player#action-object-options) on each mini-media-player will call the input_boolean.toggle service.
