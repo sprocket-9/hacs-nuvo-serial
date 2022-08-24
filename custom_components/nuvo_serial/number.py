@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Iterable
+from typing import Any
 
 from nuvo_serial.configuration import config
 from nuvo_serial.const import (
@@ -14,8 +14,9 @@ from nuvo_serial.const import (
 from homeassistant.components.number import NumberEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_TYPE
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo, Entity
-from homeassistant.helpers.typing import HomeAssistantType
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     CONTROL_EQ_BALANCE,
@@ -46,9 +47,9 @@ VOLUME_CONTROLS = [
 
 
 async def async_setup_entry(
-    hass: HomeAssistantType,
+    hass: HomeAssistant,
     config_entry: ConfigEntry,
-    async_add_entities: Callable[[Iterable[Entity], bool], None],
+    async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Number entities associated with each Nuvo multi-zone amplifier zone."""
 
@@ -185,26 +186,26 @@ class NuvoNumberControl(NuvoControl, NumberEntity):
         }
 
     @property
-    def min_value(self) -> float:
+    def native_min_value(self) -> float:
         """Return the minimum value."""
         return float(config[self._model][self._nuvo_config_key]["min"])
 
     @property
-    def max_value(self) -> float:
+    def native_max_value(self) -> float:
         """Return the maximum value."""
         return float(config[self._model][self._nuvo_config_key]["max"])
 
     @property
-    def step(self) -> float:
+    def native_step(self) -> float:
         """Return the increment/decrement step."""
         return float(config[self._model][self._nuvo_config_key]["step"])
 
     @property
-    def value(self) -> float:
+    def native_value(self) -> float:
         """Return the entity value to represent the entity state."""
         return self._control_value
 
-    async def async_set_value(self, value: float) -> None:
+    async def async_set_native_value(self, value: float) -> None:
         """Set new value."""
 
         return await self._nuvo_set_control_value(value)
@@ -295,10 +296,9 @@ class Balance(EQ):
     """
 
     @property
-    def min_value(self) -> float:
+    def native_min_value(self) -> float:
         """Return the minimum value."""
-        max = float(config[self._model][CONTROL_EQ_BALANCE]["max"])
-        return -max
+        return -float(config[self._model][CONTROL_EQ_BALANCE]["max"])
 
     async def _nuvo_set_control_value(self, value: float) -> None:
         """Set new value."""
@@ -329,15 +329,14 @@ class VolumeControl(NuvoNumberControl, NuvoControl):
     """Nuvo Volume based control."""
 
     @property
-    def unit_of_measurement(self) -> str:
+    def native_unit_of_measurement(self) -> str:
         """Return the unity of measurement."""
         return "dB"
 
     @property
-    def min_value(self) -> float:
+    def native_min_value(self) -> float:
         """Return the minimum value."""
-        min = float(config[self._model][CONTROL_VOLUME]["min"])
-        return -min
+        return -float(config[self._model][CONTROL_VOLUME]["min"])
 
     async def _nuvo_get_control_value(self) -> None:
         """Get value."""
