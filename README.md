@@ -75,7 +75,22 @@ e.g.
 
 A possible ser2net configuration connecting TCP port 10003 to the nuvo device on /dev/ttyUSB1:
 
+Old syntax:
+
 ```10003:raw:0:/dev/ttyUSB1:57600 8DATABITS NONE 1STOPBIT```
+
+ser2net.yaml syntax:
+```yaml
+connection: &nuvo
+    accepter: tcp,10003
+    enable: on
+    options:
+      kickolduser: true
+    connector: serialdev,
+              /dev/ttyUSB1,
+              57600n81,local
+
+```
 
 Port URL: ```socket://192.168.5.1:10003```
 
