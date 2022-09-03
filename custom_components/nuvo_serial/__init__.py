@@ -1,13 +1,13 @@
 """The Nuvo multi-zone amplifier integration."""
-import asyncio
 import logging
 
 from nuvo_serial import get_nuvo_async
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_PORT, CONF_TYPE
+from homeassistant.const import CONF_PORT, CONF_TYPE, Platform
+from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers.typing import ConfigType, HomeAssistantType, ServiceCallType
+from homeassistant.helpers.typing import ConfigType
 
 from .const import (
     COMMAND_RESPONSE_TIMEOUT,
@@ -19,17 +19,17 @@ from .const import (
     UNDO_UPDATE_LISTENER,
 )
 
-PLATFORMS = ["media_player", "number", "switch"]
+PLATFORMS = [Platform.MEDIA_PLAYER, Platform.NUMBER, Platform.SWITCH]
 
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup(hass: HomeAssistantType, config: ConfigType) -> bool:
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the Nuvo multi-zone amplifier component."""
     return True
 
 
-async def async_setup_entry(hass: HomeAssistantType, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Nuvo multi-zone amplifier from a config entry."""
 
     port = entry.options.get(CONF_PORT, entry.data[CONF_PORT])
@@ -48,20 +48,17 @@ async def async_setup_entry(hass: HomeAssistantType, entry: ConfigEntry) -> bool
         UNDO_UPDATE_LISTENER: undo_listener,
     }
 
-    for component in PLATFORMS:
-        hass.async_create_task(
-            hass.config_entries.async_forward_entry_setup(entry, component)
-        )
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    async def page_on(call: ServiceCallType) -> None:
+    async def page_on(call: ServiceCall) -> None:
         """Service call to turn paging on."""
         await nuvo.set_page(True)
 
-    async def page_off(call: ServiceCallType) -> None:
+    async def page_off(call: ServiceCall) -> None:
         """Service call to turn paging off."""
         await nuvo.set_page(False)
 
-    async def all_off(call: ServiceCallType) -> None:
+    async def all_off(call: ServiceCall) -> None:
         """Service call to turn all zones off."""
         await nuvo.all_off()
 
@@ -74,16 +71,9 @@ async def async_setup_entry(hass: HomeAssistantType, entry: ConfigEntry) -> bool
     return True
 
 
-async def async_unload_entry(hass: HomeAssistantType, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    unload_ok = all(
-        await asyncio.gather(
-            *[
-                hass.config_entries.async_forward_entry_unload(entry, component)
-                for component in PLATFORMS
-            ]
-        )
-    )
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
     # Disconnect and free the serial port
     await hass.data[DOMAIN][entry.entry_id][NUVO_OBJECT].disconnect()
@@ -96,7 +86,7 @@ async def async_unload_entry(hass: HomeAssistantType, entry: ConfigEntry) -> boo
     return unload_ok
 
 
-async def _update_listener(hass: HomeAssistantType, entry: ConfigEntry) -> None:
+async def _update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Handle options update."""
 
     await hass.config_entries.async_reload(entry.entry_id)
