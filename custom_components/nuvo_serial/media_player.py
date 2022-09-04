@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from decimal import ROUND_HALF_EVEN, Decimal
 import logging
-from typing import Any, Callable, Iterable
+from typing import Any
 
 from nuvo_serial.configuration import config
 from nuvo_serial.const import ZONE_BUTTON, ZONE_CONFIGURATION, ZONE_STATUS
@@ -15,21 +15,17 @@ from nuvo_serial.grand_concerto_essentia_g import (
 )
 import voluptuous as vol
 
-from homeassistant.components.media_player import MediaPlayerEntity
-from homeassistant.components.media_player.const import (
-    DOMAIN as MP_DOMAIN,
-    SUPPORT_GROUPING,
-    SUPPORT_SELECT_SOURCE,
-    SUPPORT_TURN_OFF,
-    SUPPORT_TURN_ON,
-    SUPPORT_VOLUME_MUTE,
-    SUPPORT_VOLUME_SET,
+from homeassistant.components.media_player import (
+    MediaPlayerEntity,
+    MediaPlayerEntityFeature,
 )
+from homeassistant.components.media_player.const import DOMAIN as MP_DOMAIN
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_ENTITY_ID, CONF_TYPE, STATE_OFF, STATE_ON
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv, entity_platform
-from homeassistant.helpers.entity import DeviceInfo, Entity
-from homeassistant.helpers.typing import HomeAssistantType
+from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     CONF_VOLUME_STEP,
@@ -51,20 +47,13 @@ from .helpers import get_sources, get_zones
 
 _LOGGER = logging.getLogger(__name__)
 
-SUPPORT_NUVO_SERIAL = (
-    SUPPORT_GROUPING
-    | SUPPORT_VOLUME_MUTE
-    | SUPPORT_VOLUME_SET
-    | SUPPORT_TURN_ON
-    | SUPPORT_TURN_OFF
-    | SUPPORT_SELECT_SOURCE
-)
+SERVICE_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTITY_ID): cv.entity_ids})
 
 
 async def async_setup_entry(
-    hass: HomeAssistantType,
+    hass: HomeAssistant,
     config_entry: ConfigEntry,
-    async_add_entities: Callable[[Iterable[Entity], bool], None],
+    async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Nuvo multi-zone amplifier platform."""
     model = config_entry.data[CONF_TYPE]
@@ -98,8 +87,6 @@ async def async_setup_entry(
 
     platform = entity_platform.async_get_current_platform()
 
-    SERVICE_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTITY_ID): cv.entity_ids})
-
     platform.async_register_entity_service(SERVICE_SNAPSHOT, SERVICE_SCHEMA, "snapshot")
     platform.async_register_entity_service(SERVICE_RESTORE, SERVICE_SCHEMA, "restore")
     platform.async_register_entity_service(SERVICE_PARTY_ON, SERVICE_SCHEMA, "party_on")
@@ -120,6 +107,15 @@ async def async_setup_entry(
 class NuvoZone(MediaPlayerEntity):
     """Representation of a Nuvo amplifier zone."""
 
+    _attr_supported_features = (
+        MediaPlayerEntityFeature.GROUPING
+        | MediaPlayerEntityFeature.VOLUME_MUTE
+        | MediaPlayerEntityFeature.VOLUME_SET
+        | MediaPlayerEntityFeature.TURN_OFF
+        | MediaPlayerEntityFeature.TURN_ON
+        | MediaPlayerEntityFeature.SELECT_SOURCE
+    )
+
     def __init__(
         self,
         nuvo: NuvoAsync,
@@ -131,7 +127,7 @@ class NuvoZone(MediaPlayerEntity):
         volume_step: int,
         max_volume: int,
         min_volume: int,
-    ):
+    ) -> None:
         """Initialize new zone."""
         self._nuvo = nuvo
         self._model = model
@@ -213,11 +209,6 @@ class NuvoZone(MediaPlayerEntity):
     def is_volume_muted(self) -> bool:
         """Boolean if volume is currently muted."""
         return self._mute
-
-    @property
-    def supported_features(self) -> int:
-        """Return flag of media commands that are supported."""
-        return SUPPORT_NUVO_SERIAL
 
     @property
     def source(self) -> str:
@@ -367,7 +358,6 @@ class NuvoZone(MediaPlayerEntity):
         if not self.available:
             return
         if z_cfg.group and z_cfg.slave_to:
-            """
             # Don't process a slaved zone's group status let the master handle
             # things. Including slaved zones in group_members will result in
             # volume sync operations for master/slaves in a group being
@@ -375,7 +365,6 @@ class NuvoZone(MediaPlayerEntity):
 
             # This means a slaved zone's keypad should not be used to initiate
             # group/ungroup operations, it should be done from the master zone keypad.
-            """
             return
         if z_cfg.group and (self._nuvo_group_id and self._nuvo_group_id == z_cfg.group):
             # Group hasn't changed
@@ -482,7 +471,7 @@ class NuvoZone(MediaPlayerEntity):
 
         controller_changed = False
 
-        """ Join this zone to the group and make it the Controller."""
+        # Join this zone to the group and make it the Controller.
         if self._nuvo_group_controller != self.entity_id:
             if self.group_id:
                 group = self.group_id
@@ -513,13 +502,13 @@ class NuvoZone(MediaPlayerEntity):
 
         # Switch on the group master if necessary
         if self.state == STATE_OFF:
-            """If the zone is off process the ZoneStatus message now as the source and
-            volume_level are required for sending in the join_group event."""
+            # If the zone is off process the ZoneStatus message now as the source and
+            # volume_level are required for sending in the join_group event.
             self._process_zone_status(await self._nuvo.set_power(self._zone_id, True))
 
         if controller_changed:
-            """Include this zone in the list of notifyees so HA in turn is notified of
-            group_controller state change."""
+            # Include this zone in the list of notifyees so HA in turn is notified of
+            # group_controller state change.
             members_to_notify = self.group_members
             if members_to_notify:
                 _LOGGER.debug(
@@ -539,9 +528,9 @@ class NuvoZone(MediaPlayerEntity):
                     },
                 )
 
-        """Fire a join_group event for each group_member entity so each zone can handle
-        joining the group and updating its group state via a ZoneConfiguration
-        message."""
+        # Fire a join_group event for each group_member entity so each zone can handle
+        # joining the group and updating its group state via a ZoneConfiguration
+        # message.
         zones_to_group = set(group_members).difference({self.entity_id})
         if zones_to_group:
             _LOGGER.debug(
@@ -567,14 +556,13 @@ class NuvoZone(MediaPlayerEntity):
         """Remove this player from any group."""
 
         if self.zone_is_group_controller:
-            """If the group_controller is removed from the group, disband the entire
-            group.
-            To remove a group_controller zone without disbanding the group, first make
-            a new group_controller by sending
-            async_join_player message to the the zone to be the new controller, with
-            its own entity_id in the group_members, then async_unjoin_player to the
-            previous group_controller zone.
-            """
+            # If the group_controller is removed from the group, disband the entire
+            # group.
+            # To remove a group_controller zone without disbanding the group, first make
+            # a new group_controller by sending
+            # async_join_player message to the the zone to be the new controller, with
+            # its own entity_id in the group_members, then async_unjoin_player to the
+            # previous group_controller zone.
             await self.async_turn_off()
             await self._disband_group()
         else:
