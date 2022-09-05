@@ -13,8 +13,9 @@ from nuvo_serial.const import (
 
 from homeassistant.components.number import NumberEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_TYPE
+from homeassistant.const import CONF_PORT, CONF_TYPE
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity import DeviceInfo, Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -55,9 +56,13 @@ async def async_setup_entry(
 
     model = config_entry.data[CONF_TYPE]
     nuvo = hass.data[DOMAIN][config_entry.entry_id][NUVO_OBJECT]
+    port = config_entry.data[CONF_PORT]
     zones = get_zones(config_entry)
     sources = get_sources(config_entry)[0]
     entities: list[Entity] = []
+
+    device_registry = dr.async_get(hass)
+    parent_device = device_registry.async_get_device(identifiers={(DOMAIN, port)})
 
     for zone_id, zone_name in zones.items():
         z_id = int(zone_id)
@@ -166,6 +171,7 @@ async def async_setup_entry(
                 CONTROL_SOURCE_GAIN,
                 CONTROL_SOURCE_GAIN,
                 SOURCE_CONFIGURATION,
+                parent_device,
             )
         )
 
@@ -178,12 +184,34 @@ class NuvoNumberControl(NuvoControl, NumberEntity):
     @property
     def device_info(self) -> DeviceInfo | None:
         """Return device info for this device."""
-        return {
-            "identifiers": {(DOMAIN, self._namespace)},
-            "name": f"{' '.join(self._model.split('_'))}",
-            "manufacturer": "Nuvo",
-            "model": self._model,
+
+        identifiers = {
+            (
+                DOMAIN,
+                f"{self._namespace}_{self._nuvo_entity_type}_{self._nuvo_id}_{self._nuvo_entity_type}",
+            )
         }
+        manufacturer = "Nuvo"
+        model = self._nuvo_entity_type.capitalize()
+        name = self._nuvo_entity_name.capitalize()
+
+        if self._nuvo_entity_type == SOURCE and self._parent_device:
+            dev_info = DeviceInfo(
+                identifiers=identifiers,
+                manufacturer=manufacturer,
+                model=model,
+                name=name,
+                via_device=(DOMAIN, self._parent_device.id),
+            )
+        else:
+            dev_info = DeviceInfo(
+                identifiers=identifiers,
+                manufacturer=manufacturer,
+                model=model,
+                name=name,
+            )
+
+        return dev_info
 
     @property
     def native_min_value(self) -> float:
@@ -353,7 +381,7 @@ class VolumeMaxControl(VolumeControl):
     @property
     def name(self) -> str:
         """Return the name of the control."""
-        return f"{self._nuvo_entity_name} Volume Max"
+        return "Volume max"
 
 
 class VolumeIniControl(VolumeControl):
@@ -366,7 +394,7 @@ class VolumeIniControl(VolumeControl):
     @property
     def name(self) -> str:
         """Return the name of the control."""
-        return f"{self._nuvo_entity_name} Volume Initial"
+        return "Volume initial"
 
 
 class VolumePageControl(VolumeControl):
@@ -379,7 +407,7 @@ class VolumePageControl(VolumeControl):
     @property
     def name(self) -> str:
         """Return the name of the control."""
-        return f"{self._nuvo_entity_name} Volume Page"
+        return "Volume page"
 
 
 class VolumePartyControl(VolumeControl):
@@ -392,4 +420,4 @@ class VolumePartyControl(VolumeControl):
     @property
     def name(self) -> str:
         """Return the name of the control."""
-        return f"{self._nuvo_entity_name} Volume Party"
+        return "Volume party"

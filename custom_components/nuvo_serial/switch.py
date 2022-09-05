@@ -2,15 +2,16 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Iterable
+from typing import Any
 
 from nuvo_serial.const import ZONE_EQ_STATUS, ZONE_VOLUME_CONFIGURATION
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_TYPE
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo, Entity
-from homeassistant.helpers.typing import HomeAssistantType
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import CONTROL_EQ_LOUDCMP, CONTROL_VOLUME_RESET, DOMAIN, NUVO_OBJECT, ZONE
 from .helpers import get_zones
@@ -20,9 +21,9 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
-    hass: HomeAssistantType,
+    hass: HomeAssistant,
     config_entry: ConfigEntry,
-    async_add_entities: Callable[[Iterable[Entity], bool], None],
+    async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Switch entities associated with each Nuvo multi-zone amplifier zone."""
 
@@ -70,12 +71,17 @@ class NuvoSwitchControl(NuvoControl, SwitchEntity):
     @property
     def device_info(self) -> DeviceInfo | None:
         """Return device info for this device."""
-        return {
-            "identifiers": {(DOMAIN, self._namespace)},
-            "name": f"{' '.join(self._model.split('_'))}",
-            "manufacturer": "Nuvo",
-            "model": self._model,
-        }
+        return DeviceInfo(
+            identifiers={
+                (
+                    DOMAIN,
+                    f"{self._namespace}_{self._nuvo_entity_type}_{self._nuvo_id}_{self._nuvo_entity_type}",
+                )
+            },
+            manufacturer="Nuvo",
+            model=self._nuvo_entity_type.capitalize(),
+            name=self._nuvo_entity_name.capitalize(),
+        )
 
     async def async_added_to_hass(self) -> None:
         """Run when entity is added to register.
@@ -159,7 +165,7 @@ class VolumeReset(NuvoSwitchControl):
     @property
     def name(self) -> str:
         """Return the name of the control."""
-        return f"{self._nuvo_entity_name} Volume Reset"
+        return "Volume reset"
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the entity on."""

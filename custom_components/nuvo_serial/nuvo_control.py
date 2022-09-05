@@ -7,11 +7,15 @@ from typing import Any
 
 from nuvo_serial.grand_concerto_essentia_g import NuvoAsync
 
+from homeassistant.helpers.device_registry import DeviceEntry
+
 _LOGGER = logging.getLogger(__name__)
 
 
 class NuvoControl:
     """Base class for Nuvo control."""
+
+    _attr_has_entity_name = True
 
     def __init__(
         self,
@@ -24,7 +28,8 @@ class NuvoControl:
         control_name: str,
         nuvo_config_key: str,
         nuvo_msg_class: str,
-    ):
+        parent_device: DeviceEntry | None = None,
+    ) -> None:
         """Init this entity."""
         self._nuvo = nuvo
         self._model = model
@@ -35,6 +40,7 @@ class NuvoControl:
         self._control_name = control_name
         self._nuvo_config_key = nuvo_config_key
         self._nuvo_msg_class = nuvo_msg_class
+        self._parent_device = parent_device
 
         self._control_value: float = 0
         self._available: bool = False
@@ -59,7 +65,7 @@ class NuvoControl:
             if part != parts[-1]:
                 capitalized_control_name += "_"
 
-        return f"{self._nuvo_entity_name} {capitalized_control_name}"
+        return f"{capitalized_control_name}"
 
     @property
     def extra_state_attributes(self) -> Mapping[str, Any] | None:

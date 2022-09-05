@@ -7,6 +7,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PORT, CONF_TYPE, Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.typing import ConfigType
 
 from .const import (
@@ -47,6 +48,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         NUVO_OBJECT: nuvo,
         UNDO_UPDATE_LISTENER: undo_listener,
     }
+
+    version = await nuvo.get_version()
+
+    device_registry = dr.async_get(hass)
+
+    device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, port)},
+        manufacturer="Nuvo",
+        model=f"{' '.join(version.model.split('_'))} {version.product_number}",
+        name=f"{' '.join(model.split('_'))}",
+        sw_version=version.firmware_version,
+        hw_version=version.hardware_version,
+    )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
