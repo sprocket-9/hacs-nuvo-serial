@@ -42,10 +42,12 @@ SERVICE_ALL_OFF = "all_off"
 SERVICE_SIMULATE_PLAY_PAUSE = "simulate_play_pause_button"
 SERVICE_SIMULATE_PREV = "simulate_prev_button"
 SERVICE_SIMULATE_NEXT = "simulate_next_button"
+SERVICE_CONFIGURE_TIME = "configure_time"
+
+SERVICE_ATTR_DATETIME = "datetime"
 
 FIRST_RUN = "first_run"
 NUVO_OBJECT = "nuvo_object"
-UNDO_UPDATE_LISTENER = "update_update_listener"
 
 DOMAIN_EVENT = "nuvo_serial_event"
 EVENT_KEYPAD_PLAY_PAUSE = "keypad_play_pause"

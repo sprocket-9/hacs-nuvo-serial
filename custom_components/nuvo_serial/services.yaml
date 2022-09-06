@@ -5,10 +5,53 @@ all_off:
 page_on:
   name: Page On
   description: Activate Paging feature for all zones.
+  fields:
+    device_id:
+      name: System
+      description: The system to turn Paging on
+      required: true
+      selector:
+        device:
+          integration: "nuvo_serial"
+          # manufacturer: "Nuvo"
+          # model: "Grand Concerto NV-I8G"
 
 page_off:
   name: Page Off
   description: Deactivate Paging feature, restoring all zone to pre-page state.
+  fields:
+    device_id:
+      name: System
+      description: The system to turn Paging on
+      required: true
+      selector:
+        device:
+          integration: "nuvo_serial"
+
+configure_time:
+  name: Configure System Time
+  description: Set the real time clock in the Grand Concerto.
+  fields:
+    # device_id:
+    #   required: True
+    #   selector:
+    #     target:
+    #       device:
+    #         integration: "nuvo_serial"
+    datetime:
+      required: true
+      name: datetime
+      description: The datetime to send
+      example: "'{{ now() | as_local() }}'"
+      selector:
+        datetime:
+        # datetime_template:
+        #   advanced: False
+        #   name: datetime_template
+        #   description: The datetime to send
+        #   example: "{{ now() | as_local() }}"
+        #   selector:
+        #     template:
 
 snapshot:
   description: Take a snapshot of the media player zone.
