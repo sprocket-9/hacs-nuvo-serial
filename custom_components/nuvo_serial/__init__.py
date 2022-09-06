@@ -17,7 +17,6 @@ from .const import (
     SERVICE_ALL_OFF,
     SERVICE_PAGE_OFF,
     SERVICE_PAGE_ON,
-    UNDO_UPDATE_LISTENER,
 )
 
 PLATFORMS = [Platform.MEDIA_PLAYER, Platform.NUMBER, Platform.SWITCH]
@@ -42,12 +41,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.error("Error connecting to Nuvo controller at %s", port)
         raise ConfigEntryNotReady from err
 
-    undo_listener = entry.add_update_listener(_update_listener)
+    entry.async_on_unload(entry.add_update_listener(_update_listener))
 
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
-        NUVO_OBJECT: nuvo,
-        UNDO_UPDATE_LISTENER: undo_listener,
-    }
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {NUVO_OBJECT: nuvo}
 
     version = await nuvo.get_version()
 
@@ -95,7 +91,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     if unload_ok:
         hass.data[DOMAIN][entry.entry_id][NUVO_OBJECT] = None
-        hass.data[DOMAIN][entry.entry_id][UNDO_UPDATE_LISTENER]()
         hass.data[DOMAIN].pop(entry.entry_id)
 
     return unload_ok

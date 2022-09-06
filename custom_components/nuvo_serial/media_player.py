@@ -28,7 +28,7 @@ from homeassistant.const import (
     STATE_OFF,
     STATE_ON,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant
 from homeassistant.helpers import (
     config_validation as cv,
     device_registry as dr,
@@ -175,6 +175,7 @@ class NuvoZone(MediaPlayerEntity):
         self._nuvo_group_members_zone_ids: set[int] = set()
         self._nuvo_group_id: int | None = None
         self._nuvo_group_controller: str = ""
+        self._events_removers: list[CALLBACK_TYPE] = []
 
     @property
     def should_poll(self) -> bool:
@@ -300,16 +301,22 @@ class NuvoZone(MediaPlayerEntity):
         self._nuvo.add_subscriber(self._update_callback, ZONE_CONFIGURATION)
         self._nuvo.add_subscriber(self._zone_button_callback, ZONE_BUTTON)
 
-        self.hass.bus.async_listen(
-            f"{DOMAIN}_group_changed", self._group_membership_changed_cb
+        self._events_removers.append(
+            self.hass.bus.async_listen(
+                f"{DOMAIN}_group_changed", self._group_membership_changed_cb
+            )
         )
 
-        self.hass.bus.async_listen(
-            f"{DOMAIN}_group_controller_changed", self._group_controller_changed_cb
+        self._events_removers.append(
+            self.hass.bus.async_listen(
+                f"{DOMAIN}_group_controller_changed", self._group_controller_changed_cb
+            )
         )
 
-        self.hass.bus.async_listen(
-            f"{DOMAIN}_join_group", self._nuvo_join_group_event_cb
+        self._events_removers.append(
+            self.hass.bus.async_listen(
+                f"{DOMAIN}_join_group", self._nuvo_join_group_event_cb
+            )
         )
 
         await self._get_group_members()
@@ -325,6 +332,9 @@ class NuvoZone(MediaPlayerEntity):
         self._nuvo.remove_subscriber(self._update_callback, ZONE_CONFIGURATION)
         self._nuvo.remove_subscriber(self._zone_button_callback, ZONE_BUTTON)
         self._nuvo = None
+
+        for remove_event_listener in self._events_removers:
+            remove_event_listener()
 
     async def _update_callback(self, message: ZoneConfiguration | ZoneStatus) -> None:
         """Update entity state callback.
