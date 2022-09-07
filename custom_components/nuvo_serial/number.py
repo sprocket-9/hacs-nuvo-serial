@@ -15,7 +15,6 @@ from homeassistant.components.number import NumberEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PORT, CONF_TYPE
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity import DeviceInfo, Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -60,9 +59,6 @@ async def async_setup_entry(
     zones = get_zones(config_entry)
     sources = get_sources(config_entry)[0]
     entities: list[Entity] = []
-
-    device_registry = dr.async_get(hass)
-    parent_device = device_registry.async_get_device(identifiers={(DOMAIN, port)})
 
     for zone_id, zone_name in zones.items():
         z_id = int(zone_id)
@@ -171,7 +167,7 @@ async def async_setup_entry(
                 CONTROL_SOURCE_GAIN,
                 CONTROL_SOURCE_GAIN,
                 SOURCE_CONFIGURATION,
-                parent_device,
+                port,
             )
         )
 
@@ -195,13 +191,13 @@ class NuvoNumberControl(NuvoControl, NumberEntity):
         model = self._nuvo_entity_type.capitalize()
         name = self._nuvo_entity_name.capitalize()
 
-        if self._nuvo_entity_type == SOURCE and self._parent_device:
+        if self._nuvo_entity_type == SOURCE and self._port:
             dev_info = DeviceInfo(
                 identifiers=identifiers,
                 manufacturer=manufacturer,
                 model=model,
                 name=name,
-                via_device=(DOMAIN, self._parent_device.id),
+                via_device=(DOMAIN, self._port),
             )
         else:
             dev_info = DeviceInfo(

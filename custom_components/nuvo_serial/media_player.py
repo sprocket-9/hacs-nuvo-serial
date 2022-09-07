@@ -29,12 +29,7 @@ from homeassistant.const import (
     STATE_ON,
 )
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant
-from homeassistant.helpers import (
-    config_validation as cv,
-    device_registry as dr,
-    entity_platform,
-)
-from homeassistant.helpers.device_registry import DeviceEntry
+from homeassistant.helpers import config_validation as cv, entity_platform
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -80,15 +75,12 @@ async def async_setup_entry(
     min_volume = config[model]["volume"]["min"]
     entities = []
 
-    device_registry = dr.async_get(hass)
-    parent_device = device_registry.async_get_device(identifiers={(DOMAIN, port)})
-
     for zone_id, zone_name in zones.items():
         z_id = int(zone_id)
         entities.append(
             NuvoZone(
                 nuvo,
-                parent_device,
+                port,
                 model,
                 sources,
                 config_entry.entry_id,
@@ -138,7 +130,7 @@ class NuvoZone(MediaPlayerEntity):
     def __init__(
         self,
         nuvo: NuvoAsync,
-        parent_device: DeviceEntry | None,
+        port: str,
         model: str,
         sources: list[Any],
         namespace: str,
@@ -150,7 +142,7 @@ class NuvoZone(MediaPlayerEntity):
     ) -> None:
         """Initialize new zone."""
         self._nuvo = nuvo
-        self._parent_device = parent_device
+        self._port = port
         self._model = model
         # dict source_id -> source name
         self._source_id_name = sources[0]
@@ -195,33 +187,14 @@ class NuvoZone(MediaPlayerEntity):
         manufacturer = "Nuvo"
         model = ZONE.capitalize()
         name = self._name.capitalize()
-        # via_device = (DOMAIN, self._parent_device.id)
 
-        if self._parent_device:
-            dev_info = DeviceInfo(
-                identifiers=identifiers,
-                manufacturer=manufacturer,
-                model=model,
-                name=name,
-                via_device=(DOMAIN, self._parent_device.id),
-            )
-        else:
-            dev_info = DeviceInfo(
-                identifiers=identifiers,
-                manufacturer=manufacturer,
-                model=model,
-                name=name,
-            )
-
-        return dev_info
-
-        # return DeviceInfo(
-        #     identifiers={(DOMAIN, self.unique_id)},
-        #     manufacturer="Nuvo",
-        #     model=ZONE.capitalize(),
-        #     name=self._name.capitalize(),
-        #     via_device=(DOMAIN, self._parent_device.id),
-        # )
+        return DeviceInfo(
+            identifiers=identifiers,
+            manufacturer=manufacturer,
+            model=model,
+            name=name,
+            via_device=(DOMAIN, self._port),
+        )
 
     @property
     def unique_id(self) -> str:
