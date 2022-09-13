@@ -3,7 +3,7 @@
   "render_readme": true,
   "country": "EN",
   "domains": ["media_player", "number", "switch"],
-  "homeassistant": "2021.10.0",
+  "homeassistant": "2022.9.0",
   "iot_class": ["Local Push"],
   "zip_release": true,
   "filename": "nuvo_serial.zip"
