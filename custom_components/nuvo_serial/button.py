@@ -68,7 +68,7 @@ class NuvoButton(ButtonEntity):
     async def async_press(self) -> None:
         """Handle the button press."""
         response = await self._nuvo.all_off()
-        if not isinstance(response, ErrorResponse):
+        if isinstance(response, ErrorResponse):
             raise HomeAssistantError(
                 f"Nuvo system state preventing {self.name} - is paging mode active?"
             )
