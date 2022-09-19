@@ -2,6 +2,7 @@
 import logging
 
 from nuvo_serial import get_nuvo_async
+from nuvo_serial.const import MODEL_GC
 from nuvo_serial.grand_concerto_essentia_g import NuvoAsync
 import voluptuous as vol
 
@@ -124,9 +125,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.services.async_register(DOMAIN, SERVICE_ALL_OFF, all_off, schema=DEVICE_SCHEMA)
 
-    hass.services.async_register(
-        DOMAIN, SERVICE_CONFIGURE_TIME, configure_time, schema=CONFIGURE_TIME_SCHEMA
-    )
+    if model == MODEL_GC:
+        hass.services.async_register(
+            DOMAIN, SERVICE_CONFIGURE_TIME, configure_time, schema=CONFIGURE_TIME_SCHEMA
+        )
 
     return True
 
