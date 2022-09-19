@@ -3,7 +3,7 @@ all_off:
   description: Switch off all zones.
   fields:
     device_id:
-      name: Device
+      name: device_id
       description: The device to send the service call to.
       required: true
       selector:
@@ -15,7 +15,7 @@ page_on:
   description: Activate Paging feature for all zones.
   fields:
     device_id:
-      name: Device
+      name: device_id
       description: The device to send the service call to.
       required: true
       selector:
@@ -27,7 +27,7 @@ page_off:
   description: Deactivate Paging feature, restoring all zone to pre-page state.
   fields:
     device_id:
-      name: Device
+      name: device_id
       description: The device to send the service call to.
       required: true
       selector:
@@ -39,7 +39,7 @@ configure_time:
   description: Set the real time clock in the Grand Concerto.
   fields:
     device_id:
-      name: Device
+      name: device_id
       description: The device to send the service call to.
       required: true
       selector:
@@ -47,18 +47,20 @@ configure_time:
           integration: "nuvo_serial"
     datetime:
       required: true
-      name: Datetime
+      name: datetime
       description: The datetime to send
       example: "'{{ now() | as_local() }}'"
       selector:
         datetime:
 
 snapshot:
-  description: Take a snapshot of the media player zone.
+  name: Snapshot
+  description: Take a snapshot of the current state of a media player zone.
   fields:
     entity_id:
-      description: Name(s) of entities that will be snapshot. Platform dependent.
+      description: entity_id(s) of media_player zone to snapshot.
       example: "media_player.living_room"
+      required: true
       selector:
         entity:
           integration: "nuvo_serial"
@@ -66,11 +68,13 @@ snapshot:
           multiple: true
 
 restore:
+  name: Restore
   description: Restore a snapshot of the media player zone.
   fields:
     entity_id:
-      description: Name(s) of entities that will be restored. Platform dependent.
+      description: entity_id(s) of media player zone to restore from snapshot.
       example: "media_player.living_room"
+      required: true
       selector:
         entity:
           integration: "nuvo_serial"
@@ -82,8 +86,9 @@ party_on:
   description: Make the media player zone the party host.
   fields:
     entity_id:
-      description: Name of entity to make party host.
+      description: entity_id of media player zone to make party host.
       example: "media_player.living_room"
+      required: true
       selector:
         entity:
           integration: "nuvo_serial"
@@ -94,8 +99,9 @@ party_off:
   description: Release the media player zone from being the party host.
   fields:
     entity_id:
-      description: Name of entity to make party host.
+      description: entity_id of media player zone to release as party host.
       example: "media_player.living_room"
+      required: true
       selector:
         entity:
           integration: "nuvo_serial"
@@ -106,8 +112,9 @@ simulate_play_pause_button:
   description: Simulate pressing zone keypad Play/Pause button.
   fields:
     entity_id:
-      description: Nuvo zone to send the button press from.
+      description: entity_id of media player zone to send the button press from.
       example: "media_player.living_room"
+      required: true
       selector:
         entity:
           integration: "nuvo_serial"
@@ -118,8 +125,9 @@ simulate_prev_button:
   description: Simulate pressing zone keypad Prev button.
   fields:
     entity_id:
-      description: Nuvo zone to send the button press from.
+      description: entity_id of media player zone to send the button press from.
       example: "media_player.living_room"
+      required: true
       selector:
         entity:
           integration: "nuvo_serial"
@@ -130,8 +138,9 @@ simulate_next_button:
   description: Simulate pressing zone keypad Next button.
   fields:
     entity_id:
-      description: Nuvo zone to send the button press from.
+      description: entity_id of media player zone to send the button press from.
       example: "media_player.living_room"
+      required: true
       selector:
         entity:
           integration: "nuvo_serial"
