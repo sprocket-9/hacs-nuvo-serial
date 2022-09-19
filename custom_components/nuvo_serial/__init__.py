@@ -24,7 +24,7 @@ from .const import (
     SERVICE_PAGE_ON,
 )
 
-PLATFORMS = [Platform.MEDIA_PLAYER, Platform.NUMBER, Platform.SWITCH]
+PLATFORMS = [Platform.BUTTON, Platform.MEDIA_PLAYER, Platform.NUMBER, Platform.SWITCH]
 
 CONFIGURE_TIME_SCHEMA = vol.Schema(
     {
