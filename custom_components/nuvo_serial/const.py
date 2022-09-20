@@ -34,11 +34,8 @@ GROUP_NON_MEMBER = 0
 
 SERVICE_SNAPSHOT = "snapshot"
 SERVICE_RESTORE = "restore"
-SERVICE_PAGE_ON = "page_on"
-SERVICE_PAGE_OFF = "page_off"
 SERVICE_PARTY_ON = "party_on"
 SERVICE_PARTY_OFF = "party_off"
-SERVICE_ALL_OFF = "all_off"
 SERVICE_SIMULATE_PLAY_PAUSE = "simulate_play_pause_button"
 SERVICE_SIMULATE_PREV = "simulate_prev_button"
 SERVICE_SIMULATE_NEXT = "simulate_next_button"

@@ -1,39 +1,3 @@
-all_off:
-  name: All Off
-  description: Switch off all zones.
-  fields:
-    device_id:
-      name: device_id
-      description: The device to send the service call to.
-      required: true
-      selector:
-        device:
-          integration: "nuvo_serial"
-
-page_on:
-  name: Page On
-  description: Activate Paging feature for all zones.
-  fields:
-    device_id:
-      name: device_id
-      description: The device to send the service call to.
-      required: true
-      selector:
-        device:
-          integration: "nuvo_serial"
-
-page_off:
-  name: Page Off
-  description: Deactivate Paging feature, restoring all zone to pre-page state.
-  fields:
-    device_id:
-      name: device_id
-      description: The device to send the service call to.
-      required: true
-      selector:
-        device:
-          integration: "nuvo_serial"
-
 configure_time:
   name: Configure System Time
   description: Set the real time clock in the Grand Concerto.

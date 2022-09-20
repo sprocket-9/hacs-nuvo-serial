@@ -4,11 +4,18 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from nuvo_serial.const import ZONE_EQ_STATUS, ZONE_VOLUME_CONFIGURATION
+from nuvo_serial.const import (
+    SYSTEM_MUTE,
+    SYSTEM_PAGING,
+    ZONE_EQ_STATUS,
+    ZONE_VOLUME_CONFIGURATION,
+)
+from nuvo_serial.grand_concerto_essentia_g import NuvoAsync
+from nuvo_serial.message import Mute, Paging
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_TYPE
+from homeassistant.const import CONF_PORT, CONF_TYPE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo, Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -29,6 +36,7 @@ async def async_setup_entry(
 
     model = config_entry.data[CONF_TYPE]
     nuvo = hass.data[DOMAIN][config_entry.entry_id][NUVO_OBJECT]
+    port = config_entry.data[CONF_PORT]
     zones = get_zones(config_entry)
     entities: list[Entity] = []
 
@@ -61,6 +69,9 @@ async def async_setup_entry(
                 ZONE_VOLUME_CONFIGURATION,
             )
         )
+
+    entities.append(PageSwitch(nuvo, port, config_entry.entry_id, "page"))
+    entities.append(MuteSwitch(nuvo, port, config_entry.entry_id, "mute"))
 
     async_add_entities(entities, False)
 
@@ -182,3 +193,149 @@ class VolumeReset(NuvoSwitchControl):
     async def _nuvo_get_control_value(self) -> None:
         """Get value."""
         await self._nuvo.zone_volume_configuration(self._nuvo_id)
+
+
+class PageSwitch(SwitchEntity):
+    """Represention of the Nuvo system Page status."""
+
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+
+    def __init__(self, nuvo: NuvoAsync, port: str, namespace: str, name: str) -> None:
+        """Initialize new switch."""
+        self._nuvo = nuvo
+        self._port = port
+        self._namespace = namespace
+        self._name = name
+        self._state: bool | None = None
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info for this device."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._port)},
+        )
+
+    @property
+    def unique_id(self) -> str | None:
+        """Return unique ID for this device."""
+        return f"{self._namespace}_{'_'.join(self._name.split())}"
+
+    @property
+    def name(self) -> str | None:
+        """Return the name of the switch."""
+        return self._name.capitalize()
+
+    async def async_added_to_hass(self) -> None:
+        """Run when entity is added to register.
+
+        Subscribe callback to handle updates from the Nuvo.
+        Request initial entity state, letting the update callback handle setting it.
+        """
+
+        self._nuvo.add_subscriber(self._update_callback, SYSTEM_PAGING)
+
+        # There's no way to query Page status so assert it.
+        await self.async_turn_off()
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Run when entity is removed to register.
+
+        Remove Nuvo update callback.
+        """
+        self._nuvo.remove_subscriber(self._update_callback, SYSTEM_PAGING)
+        self._nuvo = None
+
+    async def _update_callback(self, message: Paging) -> None:
+        """Update entity state callback.
+
+        Nuvo lib calls this when it receives new messages.
+        """
+        self._state = message["event"].page
+        self.async_schedule_update_ha_state()
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if entity is on."""
+        return bool(self._state)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn the entity on."""
+        await self._nuvo.set_page(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn the entity off."""
+        await self._nuvo.set_page(False)
+
+
+class MuteSwitch(SwitchEntity):
+    """Represention of the Nuvo system Mute status."""
+
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+
+    def __init__(self, nuvo: NuvoAsync, port: str, namespace: str, name: str) -> None:
+        """Initialize new switch."""
+        self._nuvo = nuvo
+        self._port = port
+        self._namespace = namespace
+        self._name = name
+        self._state: bool | None = None
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info for this device."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._port)},
+        )
+
+    @property
+    def unique_id(self) -> str | None:
+        """Return unique ID for this device."""
+        return f"{self._namespace}_{'_'.join(self._name.split())}"
+
+    @property
+    def name(self) -> str | None:
+        """Return the name of the switch."""
+        return self._name.capitalize()
+
+    async def async_added_to_hass(self) -> None:
+        """Run when entity is added to register.
+
+        Subscribe callback to handle updates from the Nuvo.
+        Request initial entity state, letting the update callback handle setting it.
+        """
+
+        self._nuvo.add_subscriber(self._update_callback, SYSTEM_MUTE)
+
+        # There's no way to query Mute status so assert it.
+        await self.async_turn_off()
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Run when entity is removed to register.
+
+        Remove Nuvo update callback.
+        """
+        self._nuvo.remove_subscriber(self._update_callback, SYSTEM_MUTE)
+        self._nuvo = None
+
+    async def _update_callback(self, message: Mute) -> None:
+        """Update entity state callback.
+
+        Nuvo lib calls this when it receives new messages.
+        """
+        self._state = message["event"].mute
+        self.async_schedule_update_ha_state()
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if entity is on."""
+        return bool(self._state)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn the entity on."""
+        await self._nuvo.mute_all_zones(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn the entity off."""
+        await self._nuvo.mute_all_zones(False)
