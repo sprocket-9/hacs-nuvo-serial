@@ -16,6 +16,7 @@ from nuvo_serial.grand_concerto_essentia_g import (
 import voluptuous as vol
 
 from homeassistant.components.media_player import (
+    MediaPlayerDeviceClass,
     MediaPlayerEntity,
     MediaPlayerEntityFeature,
 )
@@ -116,6 +117,7 @@ async def async_setup_entry(
 class NuvoZone(MediaPlayerEntity):
     """Representation of a Nuvo amplifier zone."""
 
+    _attr_device_class = MediaPlayerDeviceClass.SPEAKER
     _attr_has_entity_name = True
 
     _attr_supported_features = (
