@@ -114,6 +114,31 @@ async def async_setup_entry(
     )
 
 
+def group_membership_check(func):
+    """Decorate a service call func with the nuvo connection associated with a service call device_id.
+
+    If there are multiple nuvo_serial integrations installed this ensures the
+    service call is made to the correct system.
+    """
+
+    async def membership_check(self, event):
+        if event.data["target_entity"] != self.entity_id:
+            return
+
+        if (
+            not self.group_controller
+            or self.group_controller != event.data["group_controller"]
+        ):
+            return
+
+        if not self.group_id or self.group_id != event.data["group"]:
+            return
+
+        await func(self, event)
+
+    return membership_check
+
+
 class NuvoZone(MediaPlayerEntity):
     """Representation of a Nuvo amplifier zone."""
 
@@ -128,6 +153,15 @@ class NuvoZone(MediaPlayerEntity):
         | MediaPlayerEntityFeature.TURN_ON
         | MediaPlayerEntityFeature.SELECT_SOURCE
     )
+
+    power_as_state = {
+        True: STATE_ON,
+        False: STATE_OFF,
+    }
+    state_as_power = {
+        STATE_ON: True,
+        STATE_OFF: False,
+    }
 
     def __init__(
         self,
@@ -161,10 +195,10 @@ class NuvoZone(MediaPlayerEntity):
         self._min_volume = min_volume
 
         self._snapshot = None
-        self._state: str = ""
-        self._volume: float | None
-        self._source: str
-        self._mute: bool
+        self._state: str | None = None
+        self._volume: float | None = None
+        self._source: str | None = None
+        self._mute: bool | None = None
         self._nuvo_group_members: list[str] = []
         self._nuvo_group_members_zone_ids: set[int] = set()
         self._nuvo_group_id: int | None = None
@@ -218,7 +252,7 @@ class NuvoZone(MediaPlayerEntity):
         }
 
     @property
-    def state(self) -> str:
+    def state(self) -> str | None:
         """Return the state of the zone."""
         return self._state
 
@@ -228,12 +262,12 @@ class NuvoZone(MediaPlayerEntity):
         return self._volume
 
     @property
-    def is_volume_muted(self) -> bool:
+    def is_volume_muted(self) -> bool | None:
         """Boolean if volume is currently muted."""
         return self._mute
 
     @property
-    def source(self) -> str:
+    def source(self) -> str | None:
         """Return the current input source of the device."""
         return self._source
 
@@ -294,6 +328,20 @@ class NuvoZone(MediaPlayerEntity):
             )
         )
 
+        self._events_removers.append(
+            self.hass.bus.async_listen(
+                f"{DOMAIN}_group_controller_volume_changed",
+                self._group_controller_volume_changed_cb,
+            )
+        )
+
+        self._events_removers.append(
+            self.hass.bus.async_listen(
+                f"{DOMAIN}_group_controller_mute_changed",
+                self._group_controller_mute_changed_cb,
+            )
+        )
+
         await self._get_group_members()
         await self._nuvo.zone_status(self._zone_id)
         await self._nuvo.zone_configuration(self._zone_id)
@@ -329,11 +377,20 @@ class NuvoZone(MediaPlayerEntity):
         if event_name == ZONE_CONFIGURATION:
             await self._process_zone_configuration(d_class)
         elif event_name == ZONE_STATUS:
-            self._process_zone_status(d_class)
+            state_changes = self._process_zone_status(d_class)
         else:
             return
 
         self.async_schedule_update_ha_state()
+
+        if self.zone_is_group_controller and event_name == ZONE_STATUS:
+            if state_changes["power"]:
+                pass
+            else:
+                if state_changes["mute"]:
+                    self._notify_group_of_mute_change()
+                if state_changes["volume"]:
+                    self._notify_group_of_volume_change()
 
     async def _zone_button_callback(self, message: ZoneButton) -> None:
         """Fire event when a zone keypad 'PLAYPAUSE', 'PREV' or 'NEXT' button is pressed."""
@@ -350,24 +407,118 @@ class NuvoZone(MediaPlayerEntity):
             },
         )
 
-    def _process_zone_status(self, z_status: ZoneStatus) -> None:
+    def _process_zone_status(self, z_status: ZoneStatus) -> dict[str, bool]:
         """Update zone's power, volume and source state.
 
         A permitted source may not appear in the list of system-wide enabled sources.
         """
-        if not z_status.power:
-            self._state = STATE_OFF
-            return
 
-        self._state = STATE_ON
-        self._mute = z_status.mute
+        state_changes = {"power": False, "mute": False, "volume": False}
+
+        state_changes["power"] = self._process_power(z_status.power)
+
+        if self._state == STATE_OFF:
+            self._mute = None
+            self._volume = None
+            self._source = None
+            return state_changes
+
+        self._source = self._source_id_name.get(z_status.source, None)
+
+        state_changes["mute"] = self._process_mute(z_status.mute)
+
+        if self._mute:
+            return state_changes
+
+        state_changes["volume"] = self._process_volume(z_status.volume)
+        return state_changes
+
+    def _process_power(self, received_power_state: bool) -> bool:
+        _power_changed = False
+        if self._state is None:
+            self._state = self.power_as_state[received_power_state]
+        else:
+            if (
+                _power_changed := self.state_as_power[self._state]
+                != received_power_state
+            ):
+                self._state = self.power_as_state[received_power_state]
+
+        return _power_changed
+
+    def _process_mute(self, received_mute_state: bool) -> bool:
+        """Process zone's mute status."""
+
+        # Zone is ON here so received_mute_state will be a bool
+        _mute_changed = False
+        if self._mute is None:
+            self._mute = received_mute_state
+        else:
+            if _mute_changed := self._mute != received_mute_state:
+                self._mute = received_mute_state
 
         if self._mute:
             self._volume = None
-        else:
-            self._volume = self._nuvo_to_hass_vol(z_status.volume)
 
-        self._source = self._source_id_name.get(z_status.source, None)
+        return _mute_changed
+
+    def _process_volume(self, received_nuvo_volume: bool) -> bool:
+        """Process zone's volume status."""
+        received_volume = self._nuvo_to_hass_vol(received_nuvo_volume)
+
+        # Zone is ON here so received_volume will be a bool
+        _volume_changed = False
+        if self._volume is None:
+            self._volume = received_volume
+        else:
+            if _volume_changed := self._volume != received_volume:
+                self._volume = received_volume
+
+        return _volume_changed
+
+    def _notify_group_of_mute_change(self):
+
+        if members_to_notify := set(self.group_members).difference({self.entity_id}):
+            _LOGGER.debug(
+                "GROUPING:EVENT:CONTROLLER:FIRE_GROUP_CONTROLLER_MUTE_CHANGED From Controller:zone %d %s/group:%d/members: %s/mute: %s",
+                self._zone_id,
+                self.entity_id,
+                GROUP_MEMBER,
+                members_to_notify,
+                str(self._mute),
+            )
+            for entity_id in members_to_notify:
+                self.hass.bus.async_fire(
+                    f"{DOMAIN}_group_controller_mute_changed",
+                    {
+                        "target_entity": entity_id,
+                        "group": GROUP_MEMBER,
+                        "group_controller": self.group_controller,
+                        "mute": self._mute,
+                    },
+                )
+
+    def _notify_group_of_volume_change(self):
+
+        if members_to_notify := set(self.group_members).difference({self.entity_id}):
+            _LOGGER.debug(
+                "GROUPING:EVENT:CONTROLLER:FIRE_GROUP_CONTROLLER_VOLUME_CHANGED From Controller:zone %d %s/group:%d/members: %s/volume: %f",
+                self._zone_id,
+                self.entity_id,
+                GROUP_MEMBER,
+                members_to_notify,
+                self._volume,
+            )
+            for entity_id in members_to_notify:
+                self.hass.bus.async_fire(
+                    f"{DOMAIN}_group_controller_volume_changed",
+                    {
+                        "target_entity": entity_id,
+                        "group": GROUP_MEMBER,
+                        "group_controller": self.group_controller,
+                        "volume": self._volume,
+                    },
+                )
 
     async def _process_zone_configuration(self, z_cfg: ZoneConfiguration) -> None:
         """Update zone's permitted sources.
@@ -422,7 +573,8 @@ class NuvoZone(MediaPlayerEntity):
             notify_group = previous_group
 
         self.async_schedule_update_ha_state()
-        self.hass.bus.async_fire(f"{DOMAIN}_group_changed", {"group": notify_group})
+        if notify_group:
+            self.hass.bus.async_fire(f"{DOMAIN}_group_changed", {"group": notify_group})
 
     async def async_select_source(self, source: str) -> None:
         """Set input source."""
@@ -449,11 +601,7 @@ class NuvoZone(MediaPlayerEntity):
 
     async def async_mute_volume(self, mute: bool) -> None:
         """Mute (true) or unmute (false) media player."""
-        if self.zone_is_group_controller:
-            for zone_id in self._nuvo_group_members_zone_ids:
-                await self._nuvo.set_mute(zone_id, mute)
-        else:
-            await self._nuvo.set_mute(self._zone_id, mute)
+        await self._nuvo.set_mute(self._zone_id, mute)
 
     async def async_set_volume_level(self, volume: float) -> None:
         """Set volume level, range 0..1.
@@ -461,29 +609,16 @@ class NuvoZone(MediaPlayerEntity):
         This has to accept HA 0..1 levels of volume
         and do the conversion to Nuvo volume format.
         """
-
         nuvo_volume = self._hass_to_nuvo_vol(volume)
-        if self.zone_is_group_controller:
-            for zone_id in self._nuvo_group_members_zone_ids:
-                await self._nuvo.set_volume(zone_id, nuvo_volume)
-        else:
-            await self._nuvo.set_volume(self._zone_id, nuvo_volume)
+        await self._nuvo.set_volume(self._zone_id, nuvo_volume)
 
     async def async_volume_up(self) -> None:
         """Volume up the media player."""
-        if self.zone_is_group_controller:
-            for zone_id in self._nuvo_group_members_zone_ids:
-                await self._nuvo.volume_up(zone_id)
-        else:
-            await self._nuvo.volume_up(self._zone_id)
+        await self._nuvo.volume_up(self._zone_id)
 
     async def async_volume_down(self) -> None:
         """Volume down media player."""
-        if self.zone_is_group_controller:
-            for zone_id in self._nuvo_group_members_zone_ids:
-                await self._nuvo.volume_down(zone_id)
-        else:
-            await self._nuvo.volume_down(self._zone_id)
+        await self._nuvo.volume_down(self._zone_id)
 
     def _nuvo_to_hass_vol(self, volume: int) -> float:
         """Convert from nuvo to hass volume."""
@@ -499,7 +634,6 @@ class NuvoZone(MediaPlayerEntity):
 
     async def async_join_players(self, group_members: list[str]):
         """Join `group_members` as a player group with the current player."""
-
         controller_changed = False
 
         # Join this zone to the group and make it the Controller.
@@ -509,7 +643,7 @@ class NuvoZone(MediaPlayerEntity):
             else:
                 group = GROUP_MEMBER
             _LOGGER.debug(
-                "GROUPING:JOIN:MAKE_CONTROLLER Controller:zone %d %s/group:%d",
+                "GROUPING:JOIN:CONTROLLER:MAKE_CONTROLLER this zone is now controller: zone %d %s/group:%d",
                 self._zone_id,
                 self.entity_id,
                 group,
@@ -522,7 +656,7 @@ class NuvoZone(MediaPlayerEntity):
 
         if not self.group_id or self.group_id != GROUP_MEMBER:
             _LOGGER.debug(
-                "GROUPING:JOIN:CONTROLLER_JOIN_GROUP Controller:zone %d %s/group:%d",
+                "GROUPING:JOIN:CONTROLLER:CONTROLLER_JOINING_GROUP This Controller:zone %d %s/group:%d",
                 self._zone_id,
                 self.entity_id,
                 GROUP_MEMBER,
@@ -543,7 +677,7 @@ class NuvoZone(MediaPlayerEntity):
             members_to_notify = self.group_members
             if members_to_notify:
                 _LOGGER.debug(
-                    "GROUPING:JOIN:FIRE_GROUP_CONTROLLER_CHANGED Controller:zone %d %s/group:%d/members: %s",
+                    "GROUPING:JOIN:CONTROLLER:FIRE_GROUP_CONTROLLER_CHANGED This Controller:zone %d %s/group:%d/members: %s",
                     self._zone_id,
                     self.entity_id,
                     self.group_id,
@@ -565,7 +699,7 @@ class NuvoZone(MediaPlayerEntity):
         zones_to_group = set(group_members).difference({self.entity_id})
         if zones_to_group:
             _LOGGER.debug(
-                "GROUPING:JOIN:FIRE_JOIN_GROUP Controller:zone %d %s/group:%d/joiners: %s",
+                "GROUPING:JOIN:CONTROLLER:FIRE_JOIN_GROUP This Controller:zone %d %s/group:%d/joiners: %s",
                 self._zone_id,
                 self.entity_id,
                 GROUP_MEMBER,
@@ -598,11 +732,11 @@ class NuvoZone(MediaPlayerEntity):
             await self._disband_group()
         else:
             _LOGGER.debug(
-                "GROUPING:UNJOIN Controller:zone %s/group:%d/removing zone:%d %s",
-                self.group_controller,
-                self.group_id,
+                "GROUPING:UNJOIN:REMOVE_MEMBER Removing this zone:%d %s/Controller:zone %s/group:%d/",
                 self._zone_id,
                 self.entity_id,
+                self.group_controller,
+                self.group_id,
             )
             await self._remove_from_nuvo_group(self._zone_id)
             await self.async_turn_off()
@@ -611,7 +745,7 @@ class NuvoZone(MediaPlayerEntity):
         """Remove all zones from this zone's group."""
 
         _LOGGER.debug(
-            "GROUPING:UNJOIN_DISBAND_GROUP Due to Controller leaving group: Controller:zone %s/group:%d/members %s",
+            "GROUPING:UNJOIN:CONTROLLER:DISBAND_GROUP Due to Controller leaving group: This Controller:zone %s/group:%d/members %s",
             self.group_controller,
             self.group_id,
             self.group_members,
@@ -628,11 +762,11 @@ class NuvoZone(MediaPlayerEntity):
 
         if event.data["group"] == self._nuvo_group_id:
             _LOGGER.debug(
-                "GROUPING:EVENT:GROUP_MEMBER_CHANGE Controller:zone %s/group:%d/member zone:%d %s",
-                self.group_controller,
-                event.data["group"],
+                "GROUPING:EVENT:GROUP_MEMBERSHIP_CHANGE This member zone:%d %s/Controller:zone %s/group:%d",
                 self._zone_id,
                 self.entity_id,
+                self.group_controller,
+                event.data["group"],
             )
             await self._get_group_members()
             self.async_schedule_update_ha_state()
@@ -647,11 +781,11 @@ class NuvoZone(MediaPlayerEntity):
         self._order_group_members()
 
         _LOGGER.debug(
-            "GROUPING:EVENT:GROUP_CONTROLLER_CHANGE New Controller:zone %s/group:%d/this member zone:%d %s",
-            self.group_controller,
-            event.data["group"],
+            "GROUPING:EVENT:MEMBER:GROUP_CONTROLLER_CHANGE This member zone:%d %s/New Controller:zone %s/group:%d/",
             self._zone_id,
             self.entity_id,
+            self.group_controller,
+            event.data["group"],
         )
         self.async_schedule_update_ha_state()
 
@@ -665,9 +799,11 @@ class NuvoZone(MediaPlayerEntity):
             return
 
         _LOGGER.debug(
-            "zone %d notified to join group %s",
+            "GROUPING:EVENT:MEMBER_JOIN_GROUP This zone: %d %s/controller: %s/group:%d",
             self._zone_id,
-            event.data,
+            self.entity_id,
+            event.data["group_controller"],
+            GROUP_MEMBER,
         )
 
         self._nuvo_group_controller = event.data["group_controller"]
@@ -693,6 +829,41 @@ class NuvoZone(MediaPlayerEntity):
             if not self.is_volume_muted:
                 await self.async_mute_volume(True)
 
+    @group_membership_check
+    async def _group_controller_volume_changed_cb(self, event) -> None:
+        """Event callback for a zone to sync its volume with the group controller."""
+
+        if self.volume_level != event.data["volume"]:
+            _LOGGER.debug(
+                "GROUPING:EVENT:MEMBER:VOLUME_SYNC_WITH_CONTROLLER: This member zone:%d %s/controller %s/group:%d/volume:%f",
+                self._zone_id,
+                self.entity_id,
+                self.group_controller,
+                event.data["group"],
+                event.data["volume"],
+            )
+            if self.is_volume_muted:
+                await self.async_mute_volume(False)
+            await self.async_set_volume_level(event.data["volume"])
+
+            self.async_schedule_update_ha_state()
+
+    @group_membership_check
+    async def _group_controller_mute_changed_cb(self, event) -> None:
+        """Event callback for zone to sync mute status with the group controller."""
+
+        if self._mute != event.data["mute"]:
+            _LOGGER.debug(
+                "GROUPING:EVENT:MEMBER:MUTE_SYNC_WITH_CONTROLLER: This member zone:%d %s/controller %s/group:%d/mute:%s",
+                self._zone_id,
+                self.entity_id,
+                self.group_controller,
+                event.data["group"],
+                str(event.data["mute"]),
+            )
+            await self.async_mute_volume(event.data["mute"])
+            self.async_schedule_update_ha_state()
+
     async def _get_group_members(self) -> None:
         """Retrieve this zone's group member zone_ids from Nuvo and convert to entity_ids."""
 
@@ -707,7 +878,7 @@ class NuvoZone(MediaPlayerEntity):
         self._order_group_members()
         self._nuvo_group_members_zone_ids = group_member_zone_ids
         _LOGGER.debug(
-            "GROUPING:GET_GROUP_MEMBERS for zone %d %s/found:%s",
+            "GROUPING:GET_GROUP_MEMBERS for this zone %d %s/found:%s",
             self._zone_id,
             self.entity_id,
             self.group_members,
