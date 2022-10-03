@@ -383,17 +383,24 @@ class NuvoZone(MediaPlayerEntity):
 
         if event_name == ZONE_CONFIGURATION:
             await self._process_zone_configuration(d_class)
+            self.async_schedule_update_ha_state()
         elif event_name == ZONE_STATUS:
             state_changes = self._process_zone_status(d_class)
-        else:
-            return
+            self.async_schedule_update_ha_state()
+            # Allow this task to finish by continuing group state processing in a new
+            # task
+            self.hass.async_create_task(self._process_state_changes(state_changes))
 
-        self.async_schedule_update_ha_state()
-
-        if self.zone_is_group_controller and event_name == ZONE_STATUS:
-            if state_changes["power"]:
+    async def _process_state_changes(self, state_changes: dict[str, bool]) -> None:
+        """Task to handle state changes for group members."""
+        if state_changes["power"]:
+            if self.zone_is_group_controller:
                 await self._group_controller_power_change()
-            else:
+            elif self.entity_id in self.group_members and self._state == STATE_OFF:
+                await self._group_member_power_change()
+
+        else:
+            if self.zone_is_group_controller:
                 if state_changes["mute"]:
                     self._notify_group_of_mute_change()
                 if state_changes["volume"]:
@@ -608,6 +615,19 @@ class NuvoZone(MediaPlayerEntity):
             # This will remove nuvo group information when the ZoneConfiguration msg
             # is processed
             await self._remove_from_nuvo_group(self._zone_id)
+
+    async def _group_member_power_change(self):
+        """Handle a power off event for a group member."""
+        _LOGGER.debug(
+            "GROUPING:UNJOIN:POWER_OFF:REMOVE_MEMBER Removing this zone due to it powering off:%d %s/Controller:zone %s/group:%d/",
+            self._zone_id,
+            self.entity_id,
+            self.group_controller,
+            self.group_id,
+        )
+        # The resulting ZoneConfiguration group processing will trigger a group change
+        # event
+        await self.async_unjoin_player()
 
     def _clear_nuvo_group_info(self):
         self._nuvo_group_controller = ""
