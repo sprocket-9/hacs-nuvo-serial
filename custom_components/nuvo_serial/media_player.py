@@ -394,7 +394,7 @@ class NuvoZone(MediaPlayerEntity):
     async def _process_state_changes(self, state_changes: dict[str, bool]) -> None:
         """Task to handle state changes for group members."""
         if state_changes["power"]:
-            if self.zone_is_group_controller:
+            if self.zone_is_group_controller and self._state == STATE_OFF:
                 await self._group_controller_power_change()
             elif self.entity_id in self.group_members and self._state == STATE_OFF:
                 await self._group_member_power_change()
@@ -491,6 +491,7 @@ class NuvoZone(MediaPlayerEntity):
         return _volume_changed
 
     def _notify_group_of_mute_change(self):
+        """Notify group members the group_controller has changed mute state."""
 
         if members_to_notify := set(self.group_members).difference({self.entity_id}):
             _LOGGER.debug(
@@ -513,6 +514,7 @@ class NuvoZone(MediaPlayerEntity):
                 )
 
     def _notify_group_of_volume_change(self):
+        """Notify group members the group_controller has changed volume."""
 
         if members_to_notify := set(self.group_members).difference({self.entity_id}):
             _LOGGER.debug(
@@ -593,28 +595,28 @@ class NuvoZone(MediaPlayerEntity):
             self.hass.bus.async_fire(f"{DOMAIN}_group_changed", {"group": notify_group})
 
     async def _group_controller_power_change(self):
-        if self._state == STATE_OFF:
-            zones_to_notify = set(self.group_members).difference({self.entity_id})
-            if zones_to_notify:
-                _LOGGER.debug(
-                    "GROUPING:UNJOIN:CONTROLLER:FIRE_DISBAND_GROUP_FROM_CONTROLLER_POWER_OFF This Controller:zone %d %s/group:%d/members: %s",
-                    self._zone_id,
-                    self.entity_id,
-                    GROUP_MEMBER,
-                    zones_to_notify,
+        """Notify group members the group_controller has switched off."""
+        zones_to_notify = set(self.group_members).difference({self.entity_id})
+        if zones_to_notify:
+            _LOGGER.debug(
+                "GROUPING:UNJOIN:CONTROLLER:FIRE_DISBAND_GROUP_FROM_CONTROLLER_POWER_OFF This Controller:zone %d %s/group:%d/members: %s",
+                self._zone_id,
+                self.entity_id,
+                GROUP_MEMBER,
+                zones_to_notify,
+            )
+            for entity_id in zones_to_notify:
+                self.hass.bus.async_fire(
+                    f"{DOMAIN}_group_disband",
+                    {
+                        "target_entity": entity_id,
+                        "group": self._nuvo_group_id,
+                        "group_controller": self.group_controller,
+                    },
                 )
-                for entity_id in zones_to_notify:
-                    self.hass.bus.async_fire(
-                        f"{DOMAIN}_group_disband",
-                        {
-                            "target_entity": entity_id,
-                            "group": self._nuvo_group_id,
-                            "group_controller": self.group_controller,
-                        },
-                    )
-            # This will remove nuvo group information when the ZoneConfiguration msg
-            # is processed
-            await self._remove_from_nuvo_group(self._zone_id)
+        # This will remove nuvo group information when the ZoneConfiguration msg
+        # is processed
+        await self._remove_from_nuvo_group(self._zone_id)
 
     async def _group_member_power_change(self):
         """Handle a power off event for a group member."""
@@ -625,9 +627,9 @@ class NuvoZone(MediaPlayerEntity):
             self.group_controller,
             self.group_id,
         )
-        # The resulting ZoneConfiguration group processing will trigger a group change
-        # event
-        await self.async_unjoin_player()
+        # This will remove nuvo group information when the ZoneConfiguration msg
+        # is processed and trigger a group change event.
+        await self._remove_from_nuvo_group(self._zone_id)
 
     def _clear_nuvo_group_info(self):
         self._nuvo_group_controller = ""
@@ -643,19 +645,11 @@ class NuvoZone(MediaPlayerEntity):
 
     async def async_turn_on(self) -> None:
         """Turn the media player on."""
-        if self.zone_is_group_controller:
-            for zone_id in self._nuvo_group_members_zone_ids:
-                await self._nuvo.set_power(zone_id, True)
-        else:
-            await self._nuvo.set_power(self._zone_id, True)
+        await self._nuvo.set_power(self._zone_id, True)
 
     async def async_turn_off(self) -> None:
         """Turn the media player off."""
-        if self.zone_is_group_controller:
-            for zone_id in self._nuvo_group_members_zone_ids:
-                await self._nuvo.set_power(zone_id, False)
-        else:
-            await self._nuvo.set_power(self._zone_id, False)
+        await self._nuvo.set_power(self._zone_id, False)
 
     async def async_mute_volume(self, mute: bool) -> None:
         """Mute (true) or unmute (false) media player."""
