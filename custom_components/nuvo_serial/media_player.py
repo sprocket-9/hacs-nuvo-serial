@@ -1,9 +1,11 @@
 """Support for interfacing with Nuvo multi-zone amplifier."""
 from __future__ import annotations
 
+from collections.abc import Iterable
 from decimal import ROUND_HALF_EVEN, Decimal
 import logging
 from typing import Any
+from uuid import uuid4
 
 from nuvo_serial.configuration import config
 from nuvo_serial.const import ZONE_BUTTON, ZONE_CONFIGURATION, ZONE_STATUS
@@ -38,8 +40,6 @@ from .const import (
     CONF_VOLUME_STEP,
     DOMAIN,
     DOMAIN_EVENT,
-    GROUP_MEMBER,
-    GROUP_NON_MEMBER,
     KEYPAD_BUTTON_TO_EVENT,
     NUVO_OBJECT,
     SERVICE_PARTY_OFF,
@@ -200,8 +200,9 @@ class NuvoZone(MediaPlayerEntity):
         self._source: str | None = None
         self._mute: bool | None = None
         self._nuvo_group_members: list[str] = []
-        self._nuvo_group_members_zone_ids: set[int] = set()
-        self._nuvo_group_id: int | None = None
+        # self._nuvo_group_members_zone_ids: set[int] = set()
+        # self._nuvo_group_id: int | None = None
+        self._nuvo_group_id: str = ""
         self._nuvo_group_controller: str = ""
         self._events_removers: list[CALLBACK_TYPE] = []
 
@@ -290,7 +291,7 @@ class NuvoZone(MediaPlayerEntity):
         return self._nuvo_group_controller
 
     @property
-    def group_id(self) -> int | None:
+    def group_id(self) -> str:
         """Return Nuvo group number."""
         return self._nuvo_group_id
 
@@ -312,19 +313,25 @@ class NuvoZone(MediaPlayerEntity):
 
         self._events_removers.append(
             self.hass.bus.async_listen(
-                f"{DOMAIN}_group_changed", self._group_membership_changed_cb
-            )
-        )
-
-        self._events_removers.append(
-            self.hass.bus.async_listen(
                 f"{DOMAIN}_group_controller_changed", self._group_controller_changed_cb
             )
         )
 
         self._events_removers.append(
             self.hass.bus.async_listen(
+                f"{DOMAIN}_group_update_member_list", self._group_update_member_list_cb
+            )
+        )
+
+        self._events_removers.append(
+            self.hass.bus.async_listen(
                 f"{DOMAIN}_join_group", self._nuvo_join_group_event_cb
+            )
+        )
+
+        self._events_removers.append(
+            self.hass.bus.async_listen(
+                f"{DOMAIN}_unjoin_group", self._nuvo_unjoin_group_event_cb
             )
         )
 
@@ -349,7 +356,6 @@ class NuvoZone(MediaPlayerEntity):
             )
         )
 
-        await self._get_group_members()
         await self._nuvo.zone_status(self._zone_id)
         await self._nuvo.zone_configuration(self._zone_id)
 
@@ -495,10 +501,10 @@ class NuvoZone(MediaPlayerEntity):
 
         if members_to_notify := set(self.group_members).difference({self.entity_id}):
             _LOGGER.debug(
-                "GROUPING:EVENT:CONTROLLER:FIRE_GROUP_CONTROLLER_MUTE_CHANGED From Controller:zone %d %s/group:%d/members: %s/mute: %s",
+                "GROUPING:EVENT:CONTROLLER:FIRE_GROUP_CONTROLLER_MUTE_CHANGED From Controller:zone %d %s/group:%s/members: %s/mute: %s",
                 self._zone_id,
                 self.entity_id,
-                GROUP_MEMBER,
+                self.group_id,
                 members_to_notify,
                 str(self._mute),
             )
@@ -507,7 +513,7 @@ class NuvoZone(MediaPlayerEntity):
                     f"{DOMAIN}_group_controller_mute_changed",
                     {
                         "target_entity": entity_id,
-                        "group": GROUP_MEMBER,
+                        "group": self.group_id,
                         "group_controller": self.group_controller,
                         "mute": self._mute,
                     },
@@ -518,10 +524,10 @@ class NuvoZone(MediaPlayerEntity):
 
         if members_to_notify := set(self.group_members).difference({self.entity_id}):
             _LOGGER.debug(
-                "GROUPING:EVENT:CONTROLLER:FIRE_GROUP_CONTROLLER_VOLUME_CHANGED From Controller:zone %d %s/group:%d/members: %s/volume: %f",
+                "GROUPING:EVENT:CONTROLLER:FIRE_GROUP_CONTROLLER_VOLUME_CHANGED From Controller:zone %d %s/group:%s/members: %s/volume: %f",
                 self._zone_id,
                 self.entity_id,
-                GROUP_MEMBER,
+                self.group_id,
                 members_to_notify,
                 self._volume,
             )
@@ -530,7 +536,7 @@ class NuvoZone(MediaPlayerEntity):
                     f"{DOMAIN}_group_controller_volume_changed",
                     {
                         "target_entity": entity_id,
-                        "group": GROUP_MEMBER,
+                        "group": self.group_id,
                         "group_controller": self.group_controller,
                         "volume": self._volume,
                     },
@@ -552,57 +558,57 @@ class NuvoZone(MediaPlayerEntity):
             )
         )
 
-        self._process_nuvo_group_status(z_cfg)
+        # self._process_nuvo_group_status(z_cfg)
 
-    def _process_nuvo_group_status(self, z_cfg: ZoneConfiguration):
-        """Process Nuvo group status."""
-
-        if not self.available:
-            return
-        if z_cfg.group and z_cfg.slave_to:
-            # Don't process a slaved zone's group status let the master handle
-            # things. Including slaved zones in group_members will result in
-            # volume sync operations for master/slaves in a group being
-            # repeated by the number of slaved zones in the group.
-
-            # This means a slaved zone's keypad should not be used to initiate
-            # group/ungroup operations, it should be done from the master zone keypad.
-            return
-        if z_cfg.group and (self._nuvo_group_id and self._nuvo_group_id == z_cfg.group):
-            # Group hasn't changed
-            return
-        if self._nuvo_group_id is None and z_cfg.group is None:
-            return
-        if self._nuvo_group_id is None and z_cfg.group == GROUP_NON_MEMBER:
-            self._nuvo_group_id = z_cfg.group
-            return
-
-        previous_group = self._nuvo_group_id
-        self._nuvo_group_id = z_cfg.group
-        notify_group = None
-
-        # Group Join
-        if not previous_group and z_cfg.group:
-            notify_group = z_cfg.group
-
-        # Group Leave
-        elif previous_group and not z_cfg.group:
-            self._clear_nuvo_group_info()
-            notify_group = previous_group
-
-        self.async_schedule_update_ha_state()
-        if notify_group:
-            self.hass.bus.async_fire(f"{DOMAIN}_group_changed", {"group": notify_group})
+    # def _process_nuvo_group_status(self, z_cfg: ZoneConfiguration):
+    #     """Process Nuvo group status."""
+    #
+    #     if not self.available:
+    #         return
+    #     if z_cfg.group and z_cfg.slave_to:
+    #         # Don't process a slaved zone's group status let the master handle
+    #         # things. Including slaved zones in group_members will result in
+    #         # volume sync operations for master/slaves in a group being
+    #         # repeated by the number of slaved zones in the group.
+    #
+    #         # This means a slaved zone's keypad should not be used to initiate
+    #         # group/ungroup operations, it should be done from the master zone keypad.
+    #         return
+    #     if z_cfg.group and (self._nuvo_group_id and self._nuvo_group_id == z_cfg.group):
+    #         # Group hasn't changed
+    #         return
+    #     if self._nuvo_group_id is None and z_cfg.group is None:
+    #         return
+    #     if self._nuvo_group_id is None and z_cfg.group == GROUP_NON_MEMBER:
+    #         self._nuvo_group_id = z_cfg.group
+    #         return
+    #
+    #     previous_group = self._nuvo_group_id
+    #     self._nuvo_group_id = z_cfg.group
+    #     notify_group = None
+    #
+    #     # Group Join
+    #     if not previous_group and z_cfg.group:
+    #         notify_group = z_cfg.group
+    #
+    #     # Group Leave
+    #     elif previous_group and not z_cfg.group:
+    #         self._clear_nuvo_group_info()
+    #         notify_group = previous_group
+    #
+    #     self.async_schedule_update_ha_state()
+    #     if notify_group:
+    #         self.hass.bus.async_fire(f"{DOMAIN}_group_changed", {"group": notify_group})
 
     async def _group_controller_power_change(self):
         """Notify group members the group_controller has switched off."""
         zones_to_notify = set(self.group_members).difference({self.entity_id})
         if zones_to_notify:
             _LOGGER.debug(
-                "GROUPING:UNJOIN:CONTROLLER:FIRE_DISBAND_GROUP_FROM_CONTROLLER_POWER_OFF This Controller:zone %d %s/group:%d/members: %s",
+                "GROUPING:UNJOIN:CONTROLLER:FIRE_DISBAND_GROUP_FROM_CONTROLLER_POWER_OFF This Controller:zone %d %s/group:%s/members: %s",
                 self._zone_id,
                 self.entity_id,
-                GROUP_MEMBER,
+                self.group_id,
                 zones_to_notify,
             )
             for entity_id in zones_to_notify:
@@ -614,27 +620,41 @@ class NuvoZone(MediaPlayerEntity):
                         "group_controller": self.group_controller,
                     },
                 )
-        # This will remove nuvo group information when the ZoneConfiguration msg
-        # is processed
-        await self._remove_from_nuvo_group(self._zone_id)
+            self._clear_nuvo_group_info()
+            self.async_schedule_update_ha_state()
 
     async def _group_member_power_change(self):
         """Handle a power off event for a group member."""
         _LOGGER.debug(
-            "GROUPING:UNJOIN:POWER_OFF:REMOVE_MEMBER Removing this zone due to it powering off:%d %s/Controller:zone %s/group:%d/",
+            "GROUPING:UNJOIN:POWER_OFF:REMOVE_MEMBER Removing this zone due to it powering off:%d %s/Controller:zone %s/group:%s/",
             self._zone_id,
             self.entity_id,
             self.group_controller,
             self.group_id,
         )
-        # This will remove nuvo group information when the ZoneConfiguration msg
-        # is processed and trigger a group change event.
-        await self._remove_from_nuvo_group(self._zone_id)
+        self._unjoin_member_from_group()
+        self.async_schedule_update_ha_state()
+
+    def _unjoin_member_from_group(self):
+        """Remove this zone from its speaker group."""
+
+        zones_to_notify = self.group_members.copy()
+        self._remove_member_from_group_members(self.entity_id, zones_to_notify)
+        group = self.group_id
+
+        self._clear_nuvo_group_info()
+
+        if len(zones_to_notify) == 1:
+            # disband group by notifying group_controller to leave
+            self._fire_unjoin_group(zones_to_notify, group)
+        else:
+            self._fire_member_list_change(zones_to_notify, zones_to_notify, group)
 
     def _clear_nuvo_group_info(self):
+        self._nuvo_group_id = ""
         self._nuvo_group_controller = ""
         self._nuvo_group_members = []
-        self._nuvo_group_members_zone_ids = set()
+        # self._nuvo_group_members_zone_ids = set()
 
     async def async_select_source(self, source: str) -> None:
         """Set input source."""
@@ -686,88 +706,131 @@ class NuvoZone(MediaPlayerEntity):
 
     async def async_join_players(self, group_members: list[str]):
         """Join `group_members` as a player group with the current player."""
-        controller_changed = False
+        zones_to_add: Iterable[str] | None = None
+        zones_to_remove = None
+        group = str(uuid4())
+        # MMP Group All button also includes the card's entity_id in group members,
+        # remove this
+        self._remove_member_from_group_members(self.entity_id, group_members)
+        sorted_group_members = group_members.copy()
+        sorted_group_members.insert(0, self.entity_id)
 
-        # Join this zone to the group and make it the Controller.
-        if self._nuvo_group_controller != self.entity_id:
-            if self.group_id:
-                group = self.group_id
+        # Switch on the zone if necessary
+        if self.state == STATE_OFF:
+            # If the zone is off process the ZoneStatus message now as the source and
+            # volume_level are required for sending in the join_group event.
+
+            self._process_zone_status(await self._nuvo.set_power(self._zone_id, True))
+
+        if self._nuvo_group_controller == self.entity_id:
+            # This zone is already a group controller but group_members may be different
+            # than the existing members.
+            group = self.group_id
+            zones_to_add = set(group_members).difference(self.group_members)
+            # zones_to_remove = set(self.group_members).difference({self.entity_id}).difference(group_members)
+            # sorted_group_members.extend(zones_to_add)
+            # sorted_group_members = self.group_members.extend(zones_to_add)
+            sorted_group_members = list(
+                set(self.group_members).difference({self.entity_id}).union(zones_to_add)
+            )
+            sorted_group_members.insert(0, self.entity_id)
+
+        elif (
+            self._nuvo_group_controller
+            and self._nuvo_group_controller != self.entity_id
+        ):
+            # This zone is already in a group with another zone being the controller.
+
+            # The existing controller may be in group_members.
+
+            # If not, the other controller can continue being a controller if there's
+            # at least one other member remaining in the group
+            zones_to_add = set(group_members).difference({self.entity_id})
+            if self._nuvo_group_controller in zones_to_add:
+                # This zone is taking over the group from the previous controller.
+                # The previous controller will take care of removing its members, some
+                # of which may be in group_members.  No problem here though, if the
+                # group controller notifies a member to leave and that member has already
+                # changed group then it's a noop.
+                pass
             else:
-                group = GROUP_MEMBER
+                # This zone's existing controller is not being added to the new group
+                # zones_remaining_in_previous_group = set(self.group_members).difference({self.entity_id}).difference(group_members).difference({self._nuvo_group_controller})
+                zones_remaining_in_previous_group = (
+                    set(self.group_members)
+                    .difference({self.entity_id})
+                    .difference(group_members)
+                )
+                if not zones_remaining_in_previous_group.difference(
+                    {self._nuvo_group_controller}
+                ):
+                    # Disband group by telling the group_controller to leave its group
+                    zones_to_remove = set({self._nuvo_group_controller})
+                else:
+                    # Update members list for remaining group members
+                    _LOGGER.debug(
+                        "GROUPING:JOIN:CONTROLLER:NOTIFY_PREVIOUS_GROUP_OF_NEW_MEMBER_LIST This new controller: zone %d %s/group:%s/notifyees: %s",
+                        self._zone_id,
+                        self.entity_id,
+                        group,
+                        zones_remaining_in_previous_group,
+                    )
+                    self._fire_member_list_change(
+                        zones_remaining_in_previous_group,
+                        zones_remaining_in_previous_group,
+                        group,
+                    )
+
+        else:
+            # Zone is not in an existing group
+            # Make this zone the group controller.
+            zones_to_add = group_members
+
             _LOGGER.debug(
-                "GROUPING:JOIN:CONTROLLER:MAKE_CONTROLLER this zone is now controller: zone %d %s/group:%d",
+                "GROUPING:JOIN:CONTROLLER:MAKE_NEW_CONTROLLER this zone is now a new controller: zone %d %s/group:%s",
                 self._zone_id,
                 self.entity_id,
                 group,
             )
-
-            # State change
-            # Emit event to other members
-            controller_changed = True
             self._nuvo_group_controller = self.entity_id
 
-        if not self.group_id or self.group_id != GROUP_MEMBER:
+        if zones_to_remove:
             _LOGGER.debug(
-                "GROUPING:JOIN:CONTROLLER:CONTROLLER_JOINING_GROUP This Controller:zone %d %s/group:%d",
+                "GROUPING:UNJOIN:CONTROLLER:FIRE_UNJOIN_GROUP This Controller:zone %d %s/group:%s/leavers: %s",
                 self._zone_id,
                 self.entity_id,
-                GROUP_MEMBER,
+                self.group_id,
+                zones_to_remove,
             )
-            await self._process_zone_configuration(
-                await self._nuvo.zone_join_group(self._zone_id, GROUP_MEMBER)
-            )
-
-        # Switch on the group master if necessary
-        if self.state == STATE_OFF:
-            # If the zone is off process the ZoneStatus message now as the source and
-            # volume_level are required for sending in the join_group event.
-            self._process_zone_status(await self._nuvo.set_power(self._zone_id, True))
-
-        if controller_changed:
-            # Include this zone in the list of notifyees so HA in turn is notified of
-            # group_controller state change.
-            members_to_notify = self.group_members
-            if members_to_notify:
-                _LOGGER.debug(
-                    "GROUPING:JOIN:CONTROLLER:FIRE_GROUP_CONTROLLER_CHANGED This Controller:zone %d %s/group:%d/members: %s",
-                    self._zone_id,
-                    self.entity_id,
-                    self.group_id,
-                    members_to_notify,
-                )
-            for entity_id in members_to_notify:
-                self.hass.bus.async_fire(
-                    f"{DOMAIN}_group_controller_changed",
-                    {
-                        "target_entity": entity_id,
-                        "group": self.group_id,
-                        "group_controller": self.group_controller,
-                    },
-                )
+            self._fire_unjoin_group(zones_to_remove, self.group_id)
 
         # Fire a join_group event for each group_member entity so each zone can handle
-        # joining the group and updating its group state via a ZoneConfiguration
-        # message.
-        zones_to_group = set(group_members).difference({self.entity_id})
-        if zones_to_group:
+        # joining the group
+        if zones_to_add:
             _LOGGER.debug(
-                "GROUPING:JOIN:CONTROLLER:FIRE_JOIN_GROUP This Controller:zone %d %s/group:%d/joiners: %s",
+                "GROUPING:JOIN:CONTROLLER:FIRE_JOIN_GROUP This Controller:zone %d %s/group:%s/joiners: %s",
                 self._zone_id,
                 self.entity_id,
-                GROUP_MEMBER,
-                zones_to_group,
+                group,
+                zones_to_add,
             )
-            for entity_id in zones_to_group:
+            for entity_id in zones_to_add:
                 self.hass.bus.async_fire(
                     f"{DOMAIN}_join_group",
                     {
                         "target_entity": entity_id,
-                        "group": GROUP_MEMBER,
+                        "group": group,
+                        "group_members": sorted_group_members,
                         "group_controller": self.group_controller,
                         "source": self.source,
                         "volume": self.volume_level,
                     },
                 )
+
+        self._nuvo_group_id = group
+        self._nuvo_group_controller = self.entity_id
+        self._nuvo_group_members = sorted_group_members
+        self.async_schedule_update_ha_state()
 
     async def async_unjoin_player(self) -> None:
         """Remove this player from any group."""
@@ -780,48 +843,82 @@ class NuvoZone(MediaPlayerEntity):
             # async_join_player message to the the zone to be the new controller, with
             # its own entity_id in the group_members, then async_unjoin_player to the
             # previous group_controller zone.
-            await self.async_turn_off()
-            await self._disband_group()
+            # self._disband_group()
+            # self._clear_nuvo_group_info()
+            pass
         else:
             _LOGGER.debug(
-                "GROUPING:UNJOIN:REMOVE_MEMBER Removing this zone:%d %s/Controller:zone %s/group:%d/",
+                "GROUPING:UNJOIN_PLAYER_SERVICE_CALL:REMOVE_MEMBER Removing this member zone:%d %s/Controller:zone %s/group:%s/",
                 self._zone_id,
                 self.entity_id,
                 self.group_controller,
                 self.group_id,
             )
-            await self._remove_from_nuvo_group(self._zone_id)
-            await self.async_turn_off()
+            # ZoneStatus processing will take care of removing from group and notifying
+            # group members of change.
+            self._unjoin_member_from_group()
 
-    async def _disband_group(self):
+        self.async_schedule_update_ha_state()
+        await self.async_turn_off()
+
+    def _fire_member_list_change(
+        self, zones: Iterable[str], group_members: Iterable[str], group: str
+    ) -> None:
+        """Notify zones that group_members is their group list."""
+        for entity_id in zones:
+            self.hass.bus.async_fire(
+                f"{DOMAIN}_group_update_member_list",
+                {
+                    "target_entity": entity_id,
+                    "group": group,
+                    "group_members": group_members,
+                },
+            )
+
+    def _disband_group(self):
         """Remove all zones from this zone's group."""
 
         _LOGGER.debug(
-            "GROUPING:UNJOIN:CONTROLLER:DISBAND_GROUP Due to Controller leaving group: This Controller:zone %s/group:%d/members %s",
+            "GROUPING:UNJOIN:CONTROLLER:DISBAND_GROUP Due to Controller leaving group: This Controller:zone %s/group:%s/members %s",
             self.group_controller,
             self.group_id,
             self.group_members,
         )
-        for zone_id in self._nuvo_group_members_zone_ids:
-            await self._remove_from_nuvo_group(zone_id)
 
-    async def _remove_from_nuvo_group(self, zone_id: int):
-        """Remove zone_id from Nuvo group."""
-        await self._nuvo.zone_join_group(zone_id, GROUP_NON_MEMBER)
+        zones_to_notify = set(self.group_members).difference(self.entity_id)
+        self._fire_unjoin_group(zones_to_notify, self.group_id)
 
-    async def _group_membership_changed_cb(self, event) -> None:
-        """Event callback for a zone to retrieve its list of group members."""
+    def _fire_unjoin_group(self, zones: Iterable[str], group_id: str) -> None:
+        """Fire unjoin_group event."""
 
-        if event.data["group"] == self._nuvo_group_id:
-            _LOGGER.debug(
-                "GROUPING:EVENT:GROUP_MEMBERSHIP_CHANGE This member zone:%d %s/Controller:zone %s/group:%d",
-                self._zone_id,
-                self.entity_id,
-                self.group_controller,
-                event.data["group"],
+        for entity_id in zones:
+            self.hass.bus.async_fire(
+                f"{DOMAIN}_unjoin_group",
+                {
+                    "target_entity": entity_id,
+                    "group": group_id,
+                },
             )
-            await self._get_group_members()
-            self.async_schedule_update_ha_state()
+
+    async def _group_update_member_list_cb(self, event) -> None:
+        """Event callback for a zone to update its member list."""
+
+        if event.data["target_entity"] != self.entity_id:
+            return
+        if event.data["group"] != self.group_id:
+            return
+
+        self._nuvo_group_members = event.data["group_members"]
+
+        _LOGGER.debug(
+            "GROUPING:EVENT:NEW_MEMBER_LIST This member zone:%d %s/Controller:zone %s/group:%s/members:%s",
+            self._zone_id,
+            self.entity_id,
+            self.group_controller,
+            event.data["group"],
+            event.data["group_members"],
+        )
+        self.async_schedule_update_ha_state()
 
     async def _group_controller_changed_cb(self, event) -> None:
         """Event callback for a zone to update its group controller."""
@@ -830,15 +927,44 @@ class NuvoZone(MediaPlayerEntity):
             return
 
         self._nuvo_group_controller = event.data["group_controller"]
-        self._order_group_members()
 
         _LOGGER.debug(
-            "GROUPING:EVENT:MEMBER:GROUP_CONTROLLER_CHANGE This member zone:%d %s/New Controller:zone %s/group:%d/",
+            "GROUPING:EVENT:MEMBER:GROUP_CONTROLLER_CHANGE This member zone:%d %s/New Controller:zone %s/group:%s/",
             self._zone_id,
             self.entity_id,
             self.group_controller,
             event.data["group"],
         )
+        self.async_schedule_update_ha_state()
+
+    async def _nuvo_unjoin_group_event_cb(self, event) -> None:
+        """Event callback to unjoin this zone from its group."""
+
+        if event.data["target_entity"] != self.entity_id:
+            return
+        if event.data["group"] != self.group_id:
+            return
+
+        if self.zone_is_group_controller:
+            zones_to_remove = set(self.group_members).difference({self.entity_id})
+            _LOGGER.debug(
+                "GROUPING:EVENT:CONTROLLER_UNJOIN_GROUP: This controller has been notified to leave and disband its group: zone %d %s/group:%s/leavers: %s",
+                self._zone_id,
+                self.entity_id,
+                self.group_id,
+                zones_to_remove,
+            )
+            self._fire_unjoin_group(zones_to_remove, self.group_id)
+        else:
+            _LOGGER.debug(
+                "GROUPING:EVENT:MEMBER_UNJOIN_GROUP This zone: %d %s/controller: %s/group:%s",
+                self._zone_id,
+                self.entity_id,
+                self.group_controller,
+                self.group_id,
+            )
+
+        self._clear_nuvo_group_info()
         self.async_schedule_update_ha_state()
 
     async def _nuvo_join_group_event_cb(self, event) -> None:
@@ -850,18 +976,127 @@ class NuvoZone(MediaPlayerEntity):
         if event.data["target_entity"] != self.entity_id:
             return
 
-        _LOGGER.debug(
-            "GROUPING:EVENT:MEMBER_JOIN_GROUP This zone: %d %s/controller: %s/group:%d",
-            self._zone_id,
-            self.entity_id,
-            event.data["group_controller"],
-            GROUP_MEMBER,
-        )
+        zones_to_notify = set()
 
+        if self.group_members:
+            # Zone is in an existing group
+
+            # new_member_list = set(self.group_members).difference({self.entity_id})
+            new_member_list = self.group_members.copy()
+
+            self._remove_member_from_group_members(self.entity_id, new_member_list)
+
+            if self.zone_is_group_controller:
+                _LOGGER.debug(
+                    "GROUPING:EVENT:CONTROLLER_CHANGE_GROUP This (previous controller) zone: %d %s/old group:%s/new controller: %s/new group:%s",
+                    self._zone_id,
+                    self.entity_id,
+                    self.group_id,
+                    event.data["group_controller"],
+                    event.data["group"],
+                )
+                # Disband the existing group
+                _LOGGER.debug(
+                    "GROUPING:DISBAND:CONTROLLER:FIRE_DISBAND_GROUP_FROM_CONTROLLER_JOINING_ANOTHER_GROUP This Controller:zone %d %s/group:%s/notifyees: %s",
+                    self._zone_id,
+                    self.entity_id,
+                    self.group_id,
+                    new_member_list,
+                )
+                self._fire_unjoin_group(new_member_list, self.group_id)
+
+                zones_to_notify = set(event.data["group_members"]).difference(
+                    {self.entity_id, event.data["group_controller"]}
+                )
+
+                if zones_to_notify:
+                    _LOGGER.debug(
+                        "GROUPING:EVENT:MEMBER_JOINED_NEW_GROUP:NOTIFY_GROUP_MEMBERS_OF_NEW_MEMBER_LIST This new member zone: zone %d %s/group:%s/notifyees: %s",
+                        self._zone_id,
+                        self.entity_id,
+                        self.group_id,
+                        zones_to_notify,
+                    )
+                    # self._fire_member_list_change(zones_to_notify, event.data["group_members"], event.data["group"])
+
+            else:
+                # Zone is in an existing group and joining a different group
+                _LOGGER.debug(
+                    "GROUPING:EVENT:MEMBER_CHANGE_GROUP This zone: %d %s/controller: %s/group:%s",
+                    self._zone_id,
+                    self.entity_id,
+                    event.data["group_controller"],
+                    event.data["group"],
+                )
+                # Notify previous group members this zone has left
+                _LOGGER.debug(
+                    "GROUPING:CHANGE_GROUP:MEMBER:NOTIFY_PREVIOUS_GROUP_OF_NEW_MEMBER_LIST This previous member zone: zone %d %s/group:%s/notifyees: %s",
+                    self._zone_id,
+                    self.entity_id,
+                    self.group_id,
+                    new_member_list,
+                )
+                if len(new_member_list) == 1:
+                    # If there's only one member remaining in previous group, disband group
+                    # by notifying remaining member to leave its group
+                    self._fire_unjoin_group(new_member_list, self.group_id)
+                else:
+                    self._fire_member_list_change(
+                        new_member_list, new_member_list, self.group_id
+                    )
+
+                # Notify the new group members this zone has joined
+                zones_to_notify = set(event.data["group_members"]).difference(
+                    {self.entity_id, event.data["group_controller"]}
+                )
+                if zones_to_notify:
+                    _LOGGER.debug(
+                        "GROUPING:EVENT:MEMBER_JOINED_NEW_GROUP:NOTIFY_GROUP_MEMBERS_OF_NEW_MEMBER_LIST This new member zone: zone %d %s/group:%s/notifyees: %s",
+                        self._zone_id,
+                        self.entity_id,
+                        self.group_id,
+                        zones_to_notify,
+                    )
+                    # self._fire_member_list_change(zones_to_notify, event.data["group_members"], event.data["group"])
+        else:
+            # Zone is not in an existing group
+            _LOGGER.debug(
+                "GROUPING:EVENT:MEMBER_JOINED_NEW_GROUP This new member zone: %d %s/controller: %s/group:%s",
+                self._zone_id,
+                self.entity_id,
+                event.data["group_controller"],
+                event.data["group"],
+            )
+            zones_to_notify = set(event.data["group_members"]).difference(
+                {self.entity_id, event.data["group_controller"]}
+            )
+
+            if zones_to_notify:
+                _LOGGER.debug(
+                    "GROUPING:EVENT:MEMBER_JOINED_NEW_GROUP:NOTIFY_GROUP_MEMBERS_OF_NEW_MEMBER_LIST This new member zone: zone %d %s/group:%s/notifyees: %s",
+                    self._zone_id,
+                    self.entity_id,
+                    self.group_id,
+                    zones_to_notify,
+                )
+                # self._fire_member_list_change(zones_to_notify, event.data["group_members"], event.data["group"])
+
+        if zones_to_notify:
+            # Now this zone is part of the group, update the other group members of the
+            # new member list
+            self._fire_member_list_change(
+                zones_to_notify, event.data["group_members"], event.data["group"]
+            )
+
+        self._nuvo_group_id = event.data["group"]
         self._nuvo_group_controller = event.data["group_controller"]
-        await self._process_zone_configuration(
-            await self._nuvo.zone_join_group(self._zone_id, event.data["group"])
-        )
+        self._nuvo_group_members = event.data["group_members"]
+        self.async_schedule_update_ha_state()
+
+        # self._nuvo_group_controller = event.data["group_controller"]
+        # await self._process_zone_configuration(
+        #     await self._nuvo.zone_join_group(self._zone_id, event.data["group"])
+        # )
 
         if self.state == STATE_OFF:
             # Need to get the source and volume now rather than wait for the state
@@ -887,7 +1122,7 @@ class NuvoZone(MediaPlayerEntity):
 
         if self.volume_level != event.data["volume"]:
             _LOGGER.debug(
-                "GROUPING:EVENT:MEMBER:VOLUME_SYNC_WITH_CONTROLLER: This member zone:%d %s/controller %s/group:%d/volume:%f",
+                "GROUPING:EVENT:MEMBER:VOLUME_SYNC_WITH_CONTROLLER: This member zone:%d %s/controller %s/group:%s/volume:%f",
                 self._zone_id,
                 self.entity_id,
                 self.group_controller,
@@ -906,7 +1141,7 @@ class NuvoZone(MediaPlayerEntity):
 
         if self._mute != event.data["mute"]:
             _LOGGER.debug(
-                "GROUPING:EVENT:MEMBER:MUTE_SYNC_WITH_CONTROLLER: This member zone:%d %s/controller %s/group:%d/mute:%s",
+                "GROUPING:EVENT:MEMBER:MUTE_SYNC_WITH_CONTROLLER: This member zone:%d %s/controller %s/group:%s/mute:%s",
                 self._zone_id,
                 self.entity_id,
                 self.group_controller,
@@ -923,33 +1158,42 @@ class NuvoZone(MediaPlayerEntity):
             return
 
         _LOGGER.debug(
-            "GROUPING:EVENT:MEMBER_DISBAND_GROUP This zone: %d %s/controller: %s/group:%d",
+            "GROUPING:EVENT:MEMBER_DISBAND_GROUP This zone: %d %s/controller: %s/group:%s",
             self._zone_id,
             self.entity_id,
             event.data["group_controller"],
-            GROUP_MEMBER,
+            self.group_id,
         )
         await self.async_unjoin_player()
 
-    async def _get_group_members(self) -> None:
-        """Retrieve this zone's group member zone_ids from Nuvo and convert to entity_ids."""
+    # async def _get_group_members(self) -> None:
+    #     """Retrieve this zone's group member zone_ids from Nuvo and convert to entity_ids."""
+    #
+    #     member_entity_ids = []
+    #     group_member_zone_ids = await self._nuvo.zone_group_members(self._zone_id)
+    #     for z_id in group_member_zone_ids:
+    #         entity_id = await self._nuvo_zone_id_to_hass_entity_id(z_id)
+    #         if entity_id:
+    #             member_entity_ids.append(entity_id)
+    #
+    #     self._nuvo_group_members = member_entity_ids
+    #     self._order_group_members()
+    #     # self._nuvo_group_members_zone_ids = group_member_zone_ids
+    #     _LOGGER.debug(
+    #         "GROUPING:GET_GROUP_MEMBERS for this zone %d %s/found:%s",
+    #         self._zone_id,
+    #         self.entity_id,
+    #         self.group_members,
+    #     )
 
-        member_entity_ids = []
-        group_member_zone_ids = await self._nuvo.zone_group_members(self._zone_id)
-        for z_id in group_member_zone_ids:
-            entity_id = await self._nuvo_zone_id_to_hass_entity_id(z_id)
-            if entity_id:
-                member_entity_ids.append(entity_id)
-
-        self._nuvo_group_members = member_entity_ids
-        self._order_group_members()
-        self._nuvo_group_members_zone_ids = group_member_zone_ids
-        _LOGGER.debug(
-            "GROUPING:GET_GROUP_MEMBERS for this zone %d %s/found:%s",
-            self._zone_id,
-            self.entity_id,
-            self.group_members,
-        )
+    def _remove_member_from_group_members(
+        self, entity_id: str, group_members: list[str]
+    ) -> None:
+        """Remove entity_id from group_members."""
+        try:
+            group_members.remove(entity_id)
+        except ValueError:
+            pass
 
     def _order_group_members(self):
         """Make the group_controller the first element in the list of group_members."""
