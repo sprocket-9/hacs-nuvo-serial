@@ -40,6 +40,19 @@ SERVICE_CONFIGURE_TIME = "configure_time"
 
 SERVICE_ATTR_DATETIME = "datetime"
 
+SPEAKER_GROUP_JOIN = f"{DOMAIN}_speaker_group_join"
+SPEAKER_GROUP_MEMBER_LIST_JOINED = f"{DOMAIN}_speaker_group_update_member_list_joined"
+SPEAKER_GROUP_MEMBER_LIST_LEFT = f"{DOMAIN}_speaker_group_update_member_list_left"
+SPEAKER_GROUP_CONTROLLER_MUTE_CHANGED = (
+    f"{DOMAIN}_speaker_group_controller_mute_changed"
+)
+SPEAKER_GROUP_CONTROLLER_SOURCE_CHANGED = (
+    f"{DOMAIN}_speaker_group_controller_source_changed"
+)
+SPEAKER_GROUP_CONTROLLER_VOLUME_CHANGED = (
+    f"{DOMAIN}_speaker_group_controller_volume_changed"
+)
+
 FIRST_RUN = "first_run"
 NUVO_OBJECT = "nuvo_object"
 
