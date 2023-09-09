@@ -3,6 +3,7 @@
   "name": "Nuvo multi-zone amplifier (serial)",
   "documentation": "https://github.com/sprocket-9/hacs-nuvo-serial/blob/main/README.md",
   "issue_tracker": "https://github.com/sprocket-9/hacs-nuvo-serial/issues",
+  "integration_type": "hub",
   "requirements": ["nuvo-serial==0.5.2"],
   "codeowners": ["@sprocket-9"],
   "config_flow": true,
