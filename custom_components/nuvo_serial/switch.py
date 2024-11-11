@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 from nuvo_serial.const import (
+    SOURCE_CONFIGURATION,
     SYSTEM_MUTE,
     SYSTEM_PAGING,
     ZONE_EQ_STATUS,
@@ -21,8 +22,16 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo, Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import CONTROL_EQ_LOUDCMP, CONTROL_VOLUME_RESET, DOMAIN, NUVO_OBJECT, ZONE
-from .helpers import get_zones
+from .const import (
+    CONTROL_EQ_LOUDCMP,
+    CONTROL_NUVONET_SOURCE,
+    CONTROL_VOLUME_RESET,
+    DOMAIN,
+    NUVO_OBJECT,
+    SOURCE,
+    ZONE,
+)
+from .helpers import get_sources, get_zones
 from .nuvo_control import NuvoControl
 
 _LOGGER = logging.getLogger(__name__)
@@ -39,6 +48,7 @@ async def async_setup_entry(
     nuvo = hass.data[DOMAIN][config_entry.entry_id][NUVO_OBJECT]
     port = config_entry.data[CONF_PORT]
     zones = get_zones(config_entry)
+    sources = get_sources(config_entry)[0]
     entities: list[Entity] = []
 
     for zone_id, zone_name in zones.items():
@@ -68,6 +78,23 @@ async def async_setup_entry(
                 CONTROL_VOLUME_RESET,
                 CONTROL_VOLUME_RESET,
                 ZONE_VOLUME_CONFIGURATION,
+            )
+        )
+
+    for source_id, source_name in sources.items():
+        s_id = int(source_id)
+        entities.append(
+            NuvonetSource(
+                nuvo=nuvo,
+                model=model,
+                namespace=config_entry.entry_id,
+                nuvo_id=s_id,
+                nuvo_entity_type=SOURCE,
+                nuvo_entity_name=source_name,
+                control_name=CONTROL_NUVONET_SOURCE,
+                nuvo_config_key=CONTROL_NUVONET_SOURCE,
+                nuvo_msg_class=SOURCE_CONFIGURATION,
+                port=port,
             )
         )
 
@@ -194,6 +221,36 @@ class VolumeReset(NuvoSwitchControl):
     async def _nuvo_get_control_value(self) -> None:
         """Get value."""
         await self._nuvo.zone_volume_configuration(self._nuvo_id)
+
+
+class NuvonetSource(NuvoSwitchControl):
+    """Nuvonet source status control for Nuvo amplifier source."""
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if entity is on."""
+        return bool(self._control_value)
+
+    @property
+    def name(self) -> str:
+        """Return the name of the control."""
+        return "Nuvonet Source"
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn the entity on."""
+        await self._nuvo.set_source_nuvonet(self._nuvo_id, nuvonet=True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn the entity off."""
+        await self._nuvo.set_source_nuvonet(self._nuvo_id, nuvonet=False)
+
+    async def async_toggle(self, **kwargs: Any) -> None:
+        """Toggle the entity."""
+        await self._nuvo.set_source_nuvonet(self._nuvo_id, not (self.is_on))
+
+    async def _nuvo_get_control_value(self) -> None:
+        """Get value."""
+        await self._nuvo.source_configuration(self._nuvo_id)
 
 
 class PageSwitch(SwitchEntity):
