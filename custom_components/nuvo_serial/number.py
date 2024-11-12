@@ -1,4 +1,5 @@
 """Support for interfacing with Nuvo multi-zone amplifier."""
+
 from __future__ import annotations
 
 import logging
@@ -262,9 +263,11 @@ class NuvoNumberControl(NuvoControl, NumberEntity):
             if originating_id != self._nuvo_id:
                 return
             self._control_value = float(getattr(msg, self._control_name))
-            if self._control_name == "balance" and msg.balance_position == "L":
-                self._control_value = -self._control_value
-            elif self._control_name in VOLUME_CONTROLS:
+            if (
+                self._control_name == "balance"
+                and msg.balance_position == "L"
+                or self._control_name in VOLUME_CONTROLS
+            ):
                 self._control_value = -self._control_value
             self._available = True
         except (KeyError, AttributeError):

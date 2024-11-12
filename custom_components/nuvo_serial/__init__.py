@@ -1,4 +1,5 @@
 """The Nuvo multi-zone amplifier integration."""
+
 import logging
 
 from nuvo_serial import get_nuvo_async

@@ -1,4 +1,5 @@
 """Helper utils for interfacing with Nuvo multi-zone amplifier."""
+
 from __future__ import annotations
 
 from types import MappingProxyType

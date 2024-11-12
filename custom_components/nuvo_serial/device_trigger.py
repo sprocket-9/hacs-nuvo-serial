@@ -1,4 +1,5 @@
 """Provides device triggers for Nuvo multi-zone amplifier (serial)."""
+
 from __future__ import annotations
 
 import voluptuous as vol
@@ -17,14 +18,13 @@ from homeassistant.const import (
     CONF_TYPE,
 )
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant
-from homeassistant.helpers import config_validation as cv, entity_registry
+from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.typing import ConfigType
 
 from . import DOMAIN
 from .const import DOMAIN_EVENT
 
-# TODO specify your supported trigger types.
-TRIGGER_TYPES = {"keypad_play_pause", "keypad_prev", "keypad_next"}
+TRIGGER_TYPES = ("keypad_play_pause", "keypad_prev", "keypad_next")
 
 TRIGGER_SCHEMA = DEVICE_TRIGGER_BASE_SCHEMA.extend(
     {
@@ -37,45 +37,16 @@ TRIGGER_SCHEMA = DEVICE_TRIGGER_BASE_SCHEMA.extend(
 async def async_get_triggers(hass: HomeAssistant, device_id: str) -> list[dict]:
     """List device triggers for Nuvo multi-zone amplifier (serial) devices."""
 
-    registry = entity_registry.async_get(hass)
+    registry = er.async_get(hass)
     triggers = []
 
-    # TODO Read this comment and remove it.
-    # This example shows how to iterate over the entities of this device
-    # that match this integration. If your triggers instead rely on
-    # events fired by devices without entities, do something like:
-    # zha_device = await _async_get_zha_device(hass, device_id)
-    # return zha_device.device_triggers
-
     # Get all the integrations entities for this device
-    for entry in entity_registry.async_entries_for_device(registry, device_id):
+    for entry in er.async_entries_for_device(registry, device_id):
         # if entry.domain != DOMAIN and entry.platform != "media_player":
         if entry.platform != DOMAIN or entry.domain != "media_player":
             continue
 
-        # Add triggers for each entity that belongs to this integration
-        # TODO add your own triggers.
-        # triggers.append(
-        #     {
-        #         CONF_PLATFORM: "device",
-        #         CONF_DEVICE_ID: device_id,
-        #         CONF_DOMAIN: DOMAIN,
-        #         CONF_ENTITY_ID: entry.entity_id,
-        #         CONF_TYPE: "turned_on",
-        #     }
-        # )
-        # triggers.append(
-        #     {
-        #         CONF_PLATFORM: "device",
-        #         CONF_DEVICE_ID: device_id,
-        #         CONF_DOMAIN: DOMAIN,
-        #         CONF_ENTITY_ID: entry.entity_id,
-        #         CONF_TYPE: "turned_off",
-        #     }
-        # )
-
         for trigger_type in TRIGGER_TYPES:
-
             triggers.append(
                 {
                     CONF_PLATFORM: "device",

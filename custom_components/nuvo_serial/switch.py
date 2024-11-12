@@ -1,4 +1,5 @@
 """Support for interfacing with Nuvo multi-zone amplifier."""
+
 from __future__ import annotations
 
 import logging

@@ -1,4 +1,5 @@
 """Config flow for Nuvo multi-zone amplifier integration."""
+
 from __future__ import annotations
 
 import logging
@@ -26,7 +27,7 @@ from .const import COMMAND_RESPONSE_TIMEOUT, CONF_SOURCES, CONF_ZONES, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-models = {" ".join(model.split("_")): model for model in config.keys()}
+models = {" ".join(model.split("_")): model for model in config}
 DATA_SCHEMA = vol.Schema(
     {vol.Required(CONF_PORT): str, vol.Required(CONF_TYPE): vol.In(models.keys())}
 )
@@ -45,7 +46,7 @@ def _idx_from_config(data: dict[str, str]) -> dict[int, str]:
 
 @callback
 def _get_source_schema(
-    sources: dict[str, str] | list[SourceConfiguration]
+    sources: dict[str, str] | list[SourceConfiguration],
 ) -> vol.Schema:
     """Create schema for source validation."""
     if isinstance(sources, dict):
@@ -67,7 +68,7 @@ def _get_source_schema(
 
 @callback
 def _port_already_in_use(
-    hass: HomeAssistantType, port: str, exclude_id: str = None
+    hass: HomeAssistantType, port: str, exclude_id: str | None = None
 ) -> bool:
     """Check the port is not already in use."""
 
@@ -75,7 +76,7 @@ def _port_already_in_use(
 
     for existing_nuvo in hass.config_entries.async_entries(DOMAIN):
         if exclude_id and existing_nuvo.entry_id == exclude_id:
-            next
+            continue
         if existing_nuvo.data.get(CONF_PORT, "") == port:
             in_use = True
             break
@@ -116,14 +117,13 @@ class NuvoConfigFlow(ConfigFlow, domain=DOMAIN):
             except SerialException:
                 _LOGGER.exception("")
                 errors[CONF_PORT] = "port"
-            except ModelMismatchError:
+            except ModelMismatchError as err:
                 _LOGGER.exception("")
-                raise AbortFlow("model")
+                raise AbortFlow("model") from err
             except Exception:
                 _LOGGER.exception("")
                 errors["base"] = "cannot_connect"
             else:
-
                 self._data[CONF_PORT] = user_input[CONF_PORT]
                 self._data[CONF_TYPE] = models[user_input[CONF_TYPE]]
                 return await self.async_step_sources()
@@ -165,10 +165,10 @@ class NuvoConfigFlow(ConfigFlow, domain=DOMAIN):
 
         try:
             sources = await self._get_nuvo_sources()
-        except Exception:
+        except Exception as err:
             _LOGGER.exception("")
             await self._async_nuvo_disconnect()
-            raise AbortFlow("sources")
+            raise AbortFlow("sources") from err
 
         source_schema = _get_source_schema(sources)
         return self.async_show_form(
@@ -191,10 +191,10 @@ class NuvoConfigFlow(ConfigFlow, domain=DOMAIN):
 
         try:
             zones = await self._get_nuvo_zones()
-        except Exception:
+        except Exception as err:
             _LOGGER.exception("")
             await self._async_nuvo_disconnect()
-            raise AbortFlow("zones")
+            raise AbortFlow("zones") from err
 
         zone_schema = self._get_zone_schema(zones)
         return self.async_show_form(
@@ -213,13 +213,12 @@ class NuvoConfigFlow(ConfigFlow, domain=DOMAIN):
     @callback
     def _get_zone_schema(self, zones: list[ZoneConfiguration]) -> vol.Schema:
         """Create schema for zone validation."""
-        data_schema = vol.Schema(
+        return vol.Schema(
             {
                 vol.Optional(f"zone_{zone.zone}", default=zone.name): str
                 for zone in zones
             }
         )
-        return data_schema
 
     async def _get_nuvo_sources(self) -> list[SourceConfiguration]:
         """Retrieve enabled sources from Nuvo."""
@@ -302,9 +301,9 @@ class NuvoOptionsFlowHandler(OptionsFlow):
                 except SerialException:
                     _LOGGER.exception("")
                     errors[CONF_PORT] = "port"
-                except ModelMismatchError:
+                except ModelMismatchError as err:
                     _LOGGER.exception("")
-                    raise AbortFlow("model")
+                    raise AbortFlow("model") from err
                 except Exception:
                     _LOGGER.exception("")
                     errors["base"] = "cannot_connect"

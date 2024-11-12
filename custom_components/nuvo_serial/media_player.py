@@ -1,4 +1,5 @@
 """Support for interfacing with Nuvo multi-zone amplifier."""
+
 from __future__ import annotations
 
 from decimal import ROUND_HALF_EVEN, Decimal
@@ -399,14 +400,10 @@ class NuvoZone(MediaPlayerEntity):
 
     def _process_power(self, received_power_state: bool) -> bool:
         _power_changed = False
-        if self._state is None:
+        if self._state is None or (
+            _power_changed := self.state_as_power[self._state] != received_power_state
+        ):
             self._state = self.power_as_state[received_power_state]
-        else:
-            if (
-                _power_changed := self.state_as_power[self._state]
-                != received_power_state
-            ):
-                self._state = self.power_as_state[received_power_state]
 
         return _power_changed
 
@@ -415,11 +412,8 @@ class NuvoZone(MediaPlayerEntity):
 
         # Zone is ON here so received_mute_state will be a bool
         _mute_changed = False
-        if self._mute is None:
+        if self._mute is None or (_mute_changed := self._mute != received_mute_state):
             self._mute = received_mute_state
-        else:
-            if _mute_changed := self._mute != received_mute_state:
-                self._mute = received_mute_state
 
         if self._mute:
             self._volume = None
@@ -436,11 +430,8 @@ class NuvoZone(MediaPlayerEntity):
 
         # Zone is ON here so received_volume will be an int
         _volume_changed = False
-        if self._volume is None:
+        if self._volume is None or (_volume_changed := self._volume != received_volume):
             self._volume = received_volume
-        else:
-            if _volume_changed := self._volume != received_volume:
-                self._volume = received_volume
 
         return _volume_changed
 
@@ -451,11 +442,10 @@ class NuvoZone(MediaPlayerEntity):
         _received_source_name = self._source_id_name.get(received_source_id, None)
 
         _source_changed = False
-        if self._source is None:
+        if self._source is None or (
+            _source_changed := self._source != _received_source_name
+        ):
             self._source = _received_source_name
-        else:
-            if _source_changed := self._source != _received_source_name:
-                self._source = _received_source_name
 
         return _source_changed
 
@@ -469,8 +459,8 @@ class NuvoZone(MediaPlayerEntity):
             filter(
                 None,
                 [
-                    self._source_id_name.get(id, None)
-                    for id in [int(src.split("SOURCE")[1]) for src in z_cfg.sources]
+                    self._source_id_name.get(_id, None)
+                    for _id in [int(src.split("SOURCE")[1]) for src in z_cfg.sources]
                 ],
             )
         )

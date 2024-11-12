@@ -1,4 +1,5 @@
 """Speaker group implementation for Nuvo zones."""
+
 from collections.abc import Callable, Iterable
 from enum import Enum, auto
 import logging
@@ -29,7 +30,6 @@ def group_member_check(func: Callable):
     """
 
     async def membership_check(self, event):
-
         if not self.zone_is_group_member:
             return
 
@@ -53,7 +53,6 @@ def group_member_or_controller_check(func: Callable):
     """
 
     async def membership_check(self, event):
-
         if self.zone_is_group_non_member:
             return
 
@@ -285,14 +284,13 @@ class SpeakerGroup:
             elif self.zone_is_group_member and self.zone.state == STATE_OFF:
                 await self._group_member_power_change()
 
-        else:
-            if self.zone_is_group_controller:
-                if state_change["mute"]:
-                    self._fire_group_controller_mute_changed_event()
-                if state_change["volume"]:
-                    self._fire_group_controller_volume_changed_event()
-                if state_change["source"]:
-                    self._fire_group_controller_source_changed_event()
+        elif self.zone_is_group_controller:
+            if state_change["mute"]:
+                self._fire_group_controller_mute_changed_event()
+            if state_change["volume"]:
+                self._fire_group_controller_volume_changed_event()
+            if state_change["source"]:
+                self._fire_group_controller_source_changed_event()
 
     def _group_controller_power_change(self):
         """Notify group members the group_controller has switched off."""
@@ -521,7 +519,6 @@ class SpeakerGroup:
             )
 
         elif self.zone_is_group_non_member:
-
             _LOGGER.debug(
                 "GROUPING:EVENT:MEMBER_JOIN_NEW_GROUP This zone: %d %s/new group:%s/new controller:%s/new group members:%s",
                 self.zone.zone_id,
@@ -557,9 +554,8 @@ class SpeakerGroup:
             if self.zone.is_volume_muted:
                 await self.zone.async_mute_volume(False)
             await self.zone.async_set_volume_level(event.data["volume"])
-        else:
-            if not self.zone.is_volume_muted:
-                await self.zone.async_mute_volume(True)
+        elif not self.zone.is_volume_muted:
+            await self.zone.async_mute_volume(True)
 
     @group_member_check
     async def group_controller_mute_changed_event_cb(self, event: Event) -> None:
