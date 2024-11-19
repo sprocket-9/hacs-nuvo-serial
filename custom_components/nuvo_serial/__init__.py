@@ -12,7 +12,6 @@ from homeassistant.const import ATTR_DEVICE_ID, CONF_PORT, CONF_TYPE, Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers import config_validation as cv, device_registry as dr
-from homeassistant.helpers.typing import ConfigType
 
 from .const import (
     COMMAND_RESPONSE_TIMEOUT,
@@ -32,11 +31,6 @@ CONFIGURE_TIME_SCHEMA = vol.Schema(
 )
 
 _LOGGER = logging.getLogger(__name__)
-
-
-async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Set up the Nuvo multi-zone amplifier component."""
-    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

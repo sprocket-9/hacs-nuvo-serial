@@ -16,23 +16,19 @@ from nuvo_serial.grand_concerto_essentia_g import (
 )
 import voluptuous as vol
 
+# from homeassistant.components.media_player.const import DOMAIN as MP_DOMAIN
 from homeassistant.components.media_player import (
+    DOMAIN as MP_DOMAIN,
     MediaPlayerDeviceClass,
     MediaPlayerEntity,
     MediaPlayerEntityFeature,
+    MediaPlayerState,
 )
-from homeassistant.components.media_player.const import DOMAIN as MP_DOMAIN
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import (
-    ATTR_ENTITY_ID,
-    CONF_PORT,
-    CONF_TYPE,
-    STATE_OFF,
-    STATE_ON,
-)
+from homeassistant.const import ATTR_ENTITY_ID, CONF_PORT, CONF_TYPE
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant
 from homeassistant.helpers import config_validation as cv, entity_platform
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
@@ -136,12 +132,12 @@ class NuvoZone(MediaPlayerEntity):
     )
 
     power_as_state = {
-        True: STATE_ON,
-        False: STATE_OFF,
+        True: MediaPlayerState.ON,
+        False: MediaPlayerState.OFF,
     }
     state_as_power = {
-        STATE_ON: True,
-        STATE_OFF: False,
+        MediaPlayerState.ON: True,
+        MediaPlayerState.OFF: False,
     }
 
     def __init__(
@@ -176,7 +172,7 @@ class NuvoZone(MediaPlayerEntity):
         self._min_volume = min_volume
 
         self._snapshot = None
-        self._state: str | None = None
+        self._state: MediaPlayerState | None = None
         self._volume: float | None = None
         self._source: str | None = None
         self._mute: bool | None = None
@@ -230,7 +226,7 @@ class NuvoZone(MediaPlayerEntity):
         }
 
     @property
-    def state(self) -> str | None:
+    def state(self) -> MediaPlayerState | None:
         """Return the state of the zone."""
         return self._state
 
@@ -382,7 +378,7 @@ class NuvoZone(MediaPlayerEntity):
 
         state_change["power"] = self._process_power(z_status.power)
 
-        if self._state == STATE_OFF:
+        if self._state == MediaPlayerState.OFF:
             self._mute = None
             self._volume = None
             self._source = None
@@ -555,7 +551,7 @@ class NuvoZone(MediaPlayerEntity):
             )
         )
 
-    async def async_join_players(self, group_members: list[str]):
+    async def async_join_players(self, group_members: list[str]) -> None:
         """Join `group_members` as a player group with the current player."""
 
         await self._speaker_group.async_join_players(group_members)

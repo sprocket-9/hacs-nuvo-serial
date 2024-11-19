@@ -87,7 +87,7 @@ class SpeakerGroup:
     group (source selection synchronisation) feature.
     """
 
-    def __init__(self, zone):
+    def __init__(self, zone) -> None:
         """Initialize zone's speaker group status."""
         self.zone = zone
         self.group_id: str = ""
