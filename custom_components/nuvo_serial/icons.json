@@ -1,0 +1,28 @@
+{
+  "services": {
+    "configure_time": {
+      "service": "mdi:calendar-clock"
+    },
+    "snapshot": {
+      "service": "mdi:upload"
+    },
+    "restore": {
+      "service": "mdi:download"
+    },
+    "party_on": {
+      "service": "mdi:speaker-multiple"
+    },
+    "party_off": {
+      "service": "mdi:speaker"
+    },
+    "simulate_play_pause_button": {
+      "service": "mdi:play"
+    },
+    "simulate_prev_button": {
+      "service": "mdi:skip-previous"
+    },
+    "simulate_next_button": {
+      "service": "mdi:skip-next"
+    }
+  }
+}

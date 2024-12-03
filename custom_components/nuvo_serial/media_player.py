@@ -14,7 +14,6 @@ from nuvo_serial.grand_concerto_essentia_g import (
     ZoneConfiguration,
     ZoneStatus,
 )
-import voluptuous as vol
 
 # from homeassistant.components.media_player.const import DOMAIN as MP_DOMAIN
 from homeassistant.components.media_player import (
@@ -27,7 +26,7 @@ from homeassistant.components.media_player import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_ENTITY_ID, CONF_PORT, CONF_TYPE
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant
-from homeassistant.helpers import config_validation as cv, entity_platform
+from homeassistant.helpers import entity_platform
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -56,8 +55,6 @@ from .helpers import get_sources, get_zones
 from .speaker_group import SpeakerGroup
 
 _LOGGER = logging.getLogger(__name__)
-
-SERVICE_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTITY_ID): cv.entity_ids})
 
 
 async def async_setup_entry(
@@ -99,20 +96,18 @@ async def async_setup_entry(
 
     platform = entity_platform.async_get_current_platform()
 
-    platform.async_register_entity_service(SERVICE_SNAPSHOT, SERVICE_SCHEMA, "snapshot")
-    platform.async_register_entity_service(SERVICE_RESTORE, SERVICE_SCHEMA, "restore")
-    platform.async_register_entity_service(SERVICE_PARTY_ON, SERVICE_SCHEMA, "party_on")
+    platform.async_register_entity_service(SERVICE_SNAPSHOT, None, "snapshot")
+    platform.async_register_entity_service(SERVICE_RESTORE, None, "restore")
+    platform.async_register_entity_service(SERVICE_PARTY_ON, None, "party_on")
+    platform.async_register_entity_service(SERVICE_PARTY_OFF, None, "party_off")
     platform.async_register_entity_service(
-        SERVICE_PARTY_OFF, SERVICE_SCHEMA, "party_off"
+        SERVICE_SIMULATE_PLAY_PAUSE, None, "simulate_play_pause_button"
     )
     platform.async_register_entity_service(
-        SERVICE_SIMULATE_PLAY_PAUSE, SERVICE_SCHEMA, "simulate_play_pause_button"
+        SERVICE_SIMULATE_PREV, None, "simulate_prev_button"
     )
     platform.async_register_entity_service(
-        SERVICE_SIMULATE_PREV, SERVICE_SCHEMA, "simulate_prev_button"
-    )
-    platform.async_register_entity_service(
-        SERVICE_SIMULATE_NEXT, SERVICE_SCHEMA, "simulate_next_button"
+        SERVICE_SIMULATE_NEXT, None, "simulate_next_button"
     )
 
 
@@ -592,6 +587,8 @@ class NuvoZone(MediaPlayerEntity):
 
     async def simulate_play_pause_button(self) -> None:
         """Service call to simulate pressing keypad play/pause button."""
+        # breakpoint()
+        _LOGGER.info("In zone %s", self.entity_id)
         await self.nuvo.zone_button_play_pause(self.zone_id)
 
     async def simulate_prev_button(self) -> None:

@@ -91,5 +91,99 @@
       "keypad_prev": "{entity_name} keypad prev button pressed",
       "keypad_next": "{entity_name} keypad next button pressed"
     }
+  },
+  "services": {
+    "configure_time": {
+      "name": "Configure System Time",
+      "description": "Set the real time clock in the Grand Concerto",
+      "fields": {
+        "device_id": {
+          "name": "Device ID",
+          "description": "The device to send the service call to."
+        },
+        "datetime": {
+          "name": "datetime",
+          "description": "The datetime to send",
+          "example": "'{{ now() | as_local() }}'"
+        }
+      }
+    },
+    "snapshot": {
+      "name": "Snapshot",
+      "description": "Take a snapshot of the current state of a media player zone.",
+      "fields": {
+        "entity_id": {
+          "name": "Entity ID",
+          "description": "entity_id(s) of media_player zone to snapshot.",
+          "example": "media_player.living_room"
+        }
+      }
+    },
+    "restore": {
+      "name": "Restore",
+      "description": "Restore a snapshot of the media player zone.",
+      "fields": {
+        "entity_id": {
+          "name": "Entity ID",
+          "description": "entity_id(s) of media player zone to restore from snapshot.",
+          "example": "media_player.living_room"
+        }
+      }
+    },
+    "party_on": {
+      "name": "Party On",
+      "description": "Make the media player zone the party host.",
+      "fields": {
+        "entity_id": {
+          "name": "Entity ID",
+          "description": "entity_id of media player zone to make party host.",
+          "example": "media_player.living_room"
+        }
+      }
+    },
+    "party_off": {
+      "name": "Party Off",
+      "description": "Release the media player zone from being the party host.",
+      "fields": {
+        "entity_id": {
+          "name": "Entity ID",
+          "description": "entity_id of media player zone to release as party host.",
+          "example": "media_player.splat"
+        }
+      }
+    },
+    "simulate_play_pause_button": {
+      "name": "Keypad Play/Pause button",
+      "description": "Simulate pressing zone keypad Play/Pause button.",
+      "fields": {
+        "entity_id": {
+          "name": "Entity ID",
+          "description": "entity_id of media player zone to send the button press from.",
+          "example": "media_player.living_room"
+        }
+      }
+    },
+    "simulate_prev_button": {
+      "name": "Keypad Prev button",
+      "description": "Simulate pressing zone keypad Prev button.",
+      "fields": {
+        "entity_id": {
+          "name": "Entity ID",
+          "description": "entity_id of media player zone to send the button press from.",
+          "example": "media_player.living_room"
+        }
+      }
+    },
+    "simulate_next_button": {
+      "name": "Keypad Next button",
+      "description": "Simulate pressing zone keypad Next button.",
+      "fields": {
+        "entity_id": {
+          "name": "Entity ID",
+          "description": "entity_id of media player zone to send the button press from.",
+          "example": "media_player.living_room"
+        }
+      }
+    }
   }
 }
