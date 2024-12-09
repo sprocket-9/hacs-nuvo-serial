@@ -1,5 +1,7 @@
 # nuvo_serial
-Home Assistant custom component integration to control a Nuvo Grand Concerto/Essentia G using a serial connection.
+Home Assistant custom component integration to control a Nuvo Grand Concerto (NV-I8G)/Essentia G (NV-E6G) using a serial connection.
+
+For the Concerto, Essentia D, and Simplese models see the [nuvo_simple](https://github.com/brmccrary/nuvo_simple) integration.
 
 ## What this Integration does:
 
@@ -29,12 +31,13 @@ Amplifier controls exposed:
 
 #### Source:
 * Gain control
+* Nuvonet/Non-nuvonet source toggle
 
 #### System:
 * Party Mode
 * Paging
 * Zones AllOff
-
+* Zones Mute All
 
 ## What this Integration does not do:
 
@@ -129,11 +132,11 @@ An Entity will now be created for each:
 | Zone Volume Party | [Number](https://www.home-assistant.io/integrations/number/)
 | Zone Volume Reset | [Switch](https://www.home-assistant.io/integrations/switch/)
 | Source Gain | [Number](https://www.home-assistant.io/integrations/number/)
+| Source nuvonet type  toggle | [Switch](https://www.home-assistant.io/integrations/switch/)
+| System AllOff | [Button](https://www.home-assistant.io/integrations/button/)
+| System Mute All | [Switch](https://www.home-assistant.io/integrations/switch/)
 
 ## Services
-
-### nuvo_serial.all_off
-Switch off all zones.
 
 ### nuvo_serial.page_on
 Activate Paging feature for all zones.  This uses the in-built Nuvo paging feature to switch all zones to use fixed source 6 at a pre-configured paging volume.
@@ -173,37 +176,115 @@ In addition to the media player integration built-in triggers provided by Home A
 * Kitchen keypad next button pressed
 * Kitchen keypad play/pause button pressed
 
-**NOTE:** The Nuvo only emits keypad button event messages (and thus the Home Assistant keypad triggers will only fire) when the currently selected Source for a Zone is configured as a **Non-Nuvonet** source.  As of now there is no way to configure the source type through the Home Assistant integration.  Use the [nuvo-serial](https://pypi.org/project/nuvo-serial/) Python library or the Windows-based Nuvo Configurator software.
+**NOTE:** The Nuvo only emits keypad button event messages (and thus the Home Assistant keypad triggers will only fire) when the currently selected Source for a Zone is configured as a **Non-Nuvonet** source.
 
+## Zone Groups
+Multiple zones joined together in a group with one zone acting as the group controller.
+
+ * Pure HA implementation which does not use Nuvo groups under the hood - this gives a hybrid of Nuvo groups and Nuvo party mode.
+ * Group management via:
+   * HA services [media_player{join, unjoin}](https://www.home-assistant.io/integrations/media_player/#action-media_playerjoin)
+   * Mini media player (MMP) [speaker group management](https://github.com/kalkih/mini-media-player?tab=readme-ov-file#speaker-group-object)
+ * Multiple groups supported
+ * Uses the concept of a zone media_player being the group controller
+ * Group controller operations synced to group members:
+   * Volume level
+   * Mute
+   * Source selection
+   * Power on/off
+ * If the group controller leaves a group or is switched off, the group is disbanded and all group member zones are switched off
+
+### HA service call example
+
+
+```yaml
+action: media_player.join
+target:
+  entity_id: media_player.group_controller
+data:
+  group_members:
+    - media_player.office
+    - media_player.kitchen
+```
+
+### Mini media player group control
+
+The MMP docs envisage a speaker_group object in each MMP card, allowing any
+zone to be chosen as a group controller. This makes sense if you have zone
+keypads and want to dynamically use a physical zone as a group controller.  
+
+Another approach when only GUI control is needed is to use an unused
+speakerless Nuvo zone as a "virtual" group controller.  This allows zones to
+come and go as group members as required and avoids the situation of needing to
+create a new group if a physical zine group controller is switched off, but the
+other member zones  wish to remain grouped.  Note that the GC and Essentia G have 16
+and 12 physical zones respectively and will be exposed to the integration at
+install time if the zones are not in a disabled state. 
+
+* MMP LEAVE and UNGROUP buttons do the same thing for the group controller
+* MMP LEAVE for a group member removes the zone from the group and switches it off
+* MMP speaker_group.supports_master option is supported and must be true (which is the default)
+* MMP speaker_group.sync_volume option is not supported, but is implicitly true in the implementation
+* MMP speaker_group.entities.volume_offset option is not supported
+* MMP platform option: use media_player
+
+Example MMP configuration:
+
+```yaml
+    type: entities
+    state_color: true
+    entities:
+      - type: custom:mini-media-player
+        entity: media_player.group_controller
+        icon: mdi:speaker-wireless
+        volume_stateless: false
+        hide:
+          controls: false
+          play_pause: true
+          icon: true
+        name: Group Controller
+        speaker_group:
+          platform: media_player
+          icon: mdi:hexagon-multiple
+          show_group_count: true
+          expanded: true
+          sync_volume: false
+          entities:
+            - entity_id: media_player.group_controller
+              name: Group Controller
+            - entity_id: media_player.kitchen
+              name: Kitchen
+            - entity_id: media_player.office
+              name: Office
+```
 
 ### Lovelace Frontend Configuration
 Everything in this section is optional and shows a heavily opinionated method of configuring Lovelace to display the Nuvo entities.  While it may not be to everyones taste, it should at least give some inspiration for configuration possibilites.
 
 The core [Media Player](https://www.home-assistant.io/integrations/media_player/) integration (and therefore any Lovelace media control card representing a media player entity) does not provide a way to control a media device's EQ settings.  Each EQ setting is modeled using the [Number](https://www.home-assistant.io/integrations/number/) integration.  The advantage of this is the ability to use the native number ranges exposed by the Nuvo for each control rather than a card showing a generic 0-X scale.
 
-While Home Assistant will auto-create Lovelace media control and number cards for each Nuvo entity, a more polished look can be achieved using third-party cards [mini-media-player](https://github.com/kalkih/mini-media-player) and [lovelace-slider-entity-row](https://github.com/thomasloven/lovelace-slider-entity-row), both cards are installable through [HACS](https://hacs.xyz).
+While Home Assistant will auto-create Lovelace media control and number cards
+for each Nuvo entity, a more polished look can be achieved using third-party
+cards [mini-media-player](https://github.com/kalkih/mini-media-player) and
+[lovelace-slider-entity-row](https://github.com/thomasloven/lovelace-slider-entity-row),
+both cards are installable through [HACS](https://hacs.xyz).
 
-This example Lovelace configuration displays the EQ settings in a [Conditional](https://www.home-assistant.io/lovelace/conditional/) card that is only displayed when the zone is switched on and an input_boolean entity is True.  This input_boolean is toggled by tapping the mini-media-player representing the zone.  In order to achieve this, an additional input_boolean entity per-zone needs manually created (it's purely to control the frontend EQ Conditional card, it doesn't represent anything on the Nuvo itself).
+This example Lovelace configuration displays the EQ settings in a
+[Conditional](https://www.home-assistant.io/lovelace/conditional/) card which
+is only displayed when the zone is switched on and an input_boolean entity is
+True.  This input_boolean is toggled by tapping the mini-media-player
+representing the zone.  In order to achieve this, an additional
+[input_boolean](https://www.home-assistant.io/integrations/input_boolean/)
+entity per-zone needs manually created (it's purely to control the frontend EQ
+Conditional card, it doesn't represent anything on the Nuvo itself).
 
-e.g. In configuration.yaml:
+The example uses two manually created entities:
 
-```yaml
-input_boolean:
-  eq_office:
-    name: Office EQ
-    initial: off
-  eq_kitchen:
-    name: Kitchen EQ
-    initial: off
-
-```
-
-Will create the entities:
 ```
 input_boolean.eq_office
 input_boolean.eq_kitchen
 ```
-
+https://www.home-assistant.io/integrations/input_boolean/
 As shown the yaml section below, the [tap action](https://github.com/kalkih/mini-media-player#action-object-options) on each mini-media-player will call the input_boolean.toggle service.
 
 Example section in ui-lovelace.yaml:
