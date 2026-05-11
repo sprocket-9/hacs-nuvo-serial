@@ -4,11 +4,39 @@ configure_time:
       required: true
       selector:
         device:
-          integration: "nuvo_serial"
+          filter:
+            integration: "nuvo_serial"
+            model: "Grand Concerto NV-I8G"
     datetime:
       required: true
       selector:
         datetime:
+
+set_source_display:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          filter:
+            integration: "nuvo_serial"
+            model: "Source"
+    line1:
+      required: false
+      selector:
+        text:
+    line2:
+      required: false
+      selector:
+        text:
+    line3:
+      required: false
+      selector:
+        text:
+    line4:
+      required: false
+      selector:
+        text:
 
 snapshot:
   fields:

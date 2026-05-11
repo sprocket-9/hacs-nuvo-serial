@@ -3,17 +3,20 @@
     "configure_time": {
       "service": "mdi:calendar-clock"
     },
-    "snapshot": {
-      "service": "mdi:upload"
-    },
-    "restore": {
-      "service": "mdi:download"
+    "party_off": {
+      "service": "mdi:speaker"
     },
     "party_on": {
       "service": "mdi:speaker-multiple"
     },
-    "party_off": {
-      "service": "mdi:speaker"
+    "restore": {
+      "service": "mdi:download"
+    },
+    "set_source_display": {
+      "service": "mdi:format-list-bulleted"
+    },
+    "simulate_next_button": {
+      "service": "mdi:skip-next"
     },
     "simulate_play_pause_button": {
       "service": "mdi:play"
@@ -21,8 +24,8 @@
     "simulate_prev_button": {
       "service": "mdi:skip-previous"
     },
-    "simulate_next_button": {
-      "service": "mdi:skip-next"
+    "snapshot": {
+      "service": "mdi:upload"
     }
   }
 }

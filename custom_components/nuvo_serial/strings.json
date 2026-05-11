@@ -1,15 +1,19 @@
 {
   "config": {
+    "abort": {
+      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
+      "model": "Incompatible model found",
+      "port_in_use": "This Port is already in use",
+      "sources": "Unable to retrieve Source list",
+      "zones": "Unable to retrieve Zone list"
+    },
+    "error": {
+      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
+      "port": "Invalid port",
+      "unknown": "[%key:common::config_flow::error::unknown%]"
+    },
     "step": {
-      "user": {
-        "title": "Connect to the device",
-        "data": {
-          "port": "[%key:common::config_flow::data::port%]",
-          "type": "model"
-        }
-      },
       "sources": {
-        "title": "Source Names",
         "data": {
           "source_1": "Name of source #1",
           "source_2": "Name of source #2",
@@ -17,12 +21,26 @@
           "source_4": "Name of source #4",
           "source_5": "Name of source #5",
           "source_6": "Name of source #6"
-        }
+        },
+        "title": "Source Names"
+      },
+      "user": {
+        "data": {
+          "port": "[%key:common::config_flow::data::port%]",
+          "type": "model"
+        },
+        "title": "Connect to the device"
       },
       "zones": {
-        "title": "Zone Names",
         "data": {
           "zone_1": "Name of zone #1",
+          "zone_10": "Name of zone #10",
+          "zone_11": "Name of zone #11",
+          "zone_12": "Name of zone #12",
+          "zone_13": "Name of zone #13",
+          "zone_14": "Name of zone #14",
+          "zone_15": "Name of zone #15",
+          "zone_16": "Name of zone #16",
           "zone_2": "Name of zone #2",
           "zone_3": "Name of zone #3",
           "zone_4": "Name of zone #4",
@@ -30,34 +48,38 @@
           "zone_6": "Name of zone #6",
           "zone_7": "Name of zone #7",
           "zone_8": "Name of zone #8",
-          "zone_9": "Name of zone #9",
-          "zone_10": "Name of zone #10",
-          "zone_11": "Name of zone #11",
-          "zone_12": "Name of zone #12",
-          "zone_13": "Name of zone #13",
-          "zone_14": "Name of zone #14",
-          "zone_15": "Name of zone #15",
-          "zone_16": "Name of zone #16"
-        }
+          "zone_9": "Name of zone #9"
+        },
+        "title": "Zone Names"
       }
-    },
-    "error": {
-      "port": "Invalid port",
-      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
-      "unknown": "[%key:common::config_flow::error::unknown%]"
-    },
-    "abort": {
-      "model": "Incompatible model found",
-      "sources": "Unable to retrieve Source list",
-      "zones": "Unable to retrieve Zone list",
-      "port_in_use": "This Port is already in use",
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+    }
+  },
+  "device_automation": {
+    "trigger_type": {
+      "keypad_next": "{entity_name} keypad next button pressed",
+      "keypad_play_pause": "{entity_name} keypad play/pause button pressed",
+      "keypad_prev": "{entity_name} keypad prev button pressed"
     }
   },
   "options": {
+    "abort": {
+      "model": "Incompatible model found",
+      "port_in_use": "This Port is already in use",
+      "sources": "Unable to retrieve Source list",
+      "zones": "Unable to retrieve Zone list"
+    },
+    "error": {
+      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
+      "port": "Invalid port"
+    },
     "step": {
+      "port": {
+        "data": {
+          "port": "[%key:common::config_flow::data::port%]"
+        },
+        "title": "Serial Port(change requires restart)"
+      },
       "sources": {
-        "title": "Configure sources",
         "data": {
           "source_1": "Name of source #1",
           "source_2": "Name of source #2",
@@ -65,125 +87,133 @@
           "source_4": "Name of source #4",
           "source_5": "Name of source #5",
           "source_6": "Name of source #6"
-        }
-      },
-      "port": {
-        "title": "Serial Port(change requires restart)",
-        "data": {
-          "port": "[%key:common::config_flow::data::port%]"
-        }
+        },
+        "title": "Configure sources"
       }
-    },
-    "error": {
-      "port": "Invalid port",
-      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]"
-    },
-    "abort": {
-      "port_in_use": "This Port is already in use",
-      "model": "Incompatible model found",
-      "sources": "Unable to retrieve Source list",
-      "zones": "Unable to retrieve Zone list"
-    }
-  },
-  "device_automation": {
-    "trigger_type": {
-      "keypad_play_pause": "{entity_name} keypad play/pause button pressed",
-      "keypad_prev": "{entity_name} keypad prev button pressed",
-      "keypad_next": "{entity_name} keypad next button pressed"
     }
   },
   "services": {
     "configure_time": {
-      "name": "Configure System Time",
       "description": "Set the real time clock in the Grand Concerto",
       "fields": {
-        "device_id": {
-          "name": "Device ID",
-          "description": "The device to send the service call to."
-        },
         "datetime": {
-          "name": "datetime",
           "description": "The datetime to send",
-          "example": "'{{ now() | as_local() }}'"
+          "example": "'{{ now() | as_local() }}'",
+          "name": "datetime"
+        },
+        "device_id": {
+          "description": "The device to send the service call to.",
+          "name": "Device ID"
         }
-      }
-    },
-    "snapshot": {
-      "name": "Snapshot",
-      "description": "Take a snapshot of the current state of a media player zone.",
-      "fields": {
-        "entity_id": {
-          "name": "Entity ID",
-          "description": "entity_id(s) of media_player zone to snapshot.",
-          "example": "media_player.living_room"
-        }
-      }
-    },
-    "restore": {
-      "name": "Restore",
-      "description": "Restore a snapshot of the media player zone.",
-      "fields": {
-        "entity_id": {
-          "name": "Entity ID",
-          "description": "entity_id(s) of media player zone to restore from snapshot.",
-          "example": "media_player.living_room"
-        }
-      }
-    },
-    "party_on": {
-      "name": "Party On",
-      "description": "Make the media player zone the party host.",
-      "fields": {
-        "entity_id": {
-          "name": "Entity ID",
-          "description": "entity_id of media player zone to make party host.",
-          "example": "media_player.living_room"
-        }
-      }
+      },
+      "name": "Configure System Time"
     },
     "party_off": {
-      "name": "Party Off",
       "description": "Release the media player zone from being the party host.",
       "fields": {
         "entity_id": {
-          "name": "Entity ID",
           "description": "entity_id of media player zone to release as party host.",
-          "example": "media_player.splat"
+          "example": "media_player.splat",
+          "name": "Entity ID"
         }
-      }
+      },
+      "name": "Party Off"
     },
-    "simulate_play_pause_button": {
-      "name": "Keypad Play/Pause button",
-      "description": "Simulate pressing zone keypad Play/Pause button.",
+    "party_on": {
+      "description": "Make the media player zone the party host.",
       "fields": {
         "entity_id": {
-          "name": "Entity ID",
-          "description": "entity_id of media player zone to send the button press from.",
-          "example": "media_player.living_room"
+          "description": "entity_id of media player zone to make party host.",
+          "example": "media_player.living_room",
+          "name": "Entity ID"
         }
-      }
+      },
+      "name": "Party On"
     },
-    "simulate_prev_button": {
-      "name": "Keypad Prev button",
-      "description": "Simulate pressing zone keypad Prev button.",
+    "restore": {
+      "description": "Restore a snapshot of the media player zone.",
       "fields": {
         "entity_id": {
-          "name": "Entity ID",
-          "description": "entity_id of media player zone to send the button press from.",
-          "example": "media_player.living_room"
+          "description": "entity_id(s) of media player zone to restore from snapshot.",
+          "example": "media_player.living_room",
+          "name": "Entity ID"
         }
-      }
+      },
+      "name": "Restore"
+    },
+    "set_source_display": {
+      "description": "Set display lines for a Nuvo source.",
+      "fields": {
+        "device_id": {
+          "description": "The device to send the service call to.",
+          "name": "Device ID"
+        },
+        "line1": {
+          "description": "The first display line.",
+          "example": "Artist Name",
+          "name": "Line 1"
+        },
+        "line2": {
+          "description": "The second display line.",
+          "example": "Track Title",
+          "name": "Line 2"
+        },
+        "line3": {
+          "description": "The third display line.",
+          "example": "Album Name",
+          "name": "Line 3"
+        },
+        "line4": {
+          "description": "The fourth display line.",
+          "example": "",
+          "name": "Line 4"
+        }
+      },
+      "name": "Set source display lines"
     },
     "simulate_next_button": {
-      "name": "Keypad Next button",
       "description": "Simulate pressing zone keypad Next button.",
       "fields": {
         "entity_id": {
-          "name": "Entity ID",
           "description": "entity_id of media player zone to send the button press from.",
-          "example": "media_player.living_room"
+          "example": "media_player.living_room",
+          "name": "Entity ID"
         }
-      }
+      },
+      "name": "Keypad Next button"
+    },
+    "simulate_play_pause_button": {
+      "description": "Simulate pressing zone keypad Play/Pause button.",
+      "fields": {
+        "entity_id": {
+          "description": "entity_id of media player zone to send the button press from.",
+          "example": "media_player.living_room",
+          "name": "Entity ID"
+        }
+      },
+      "name": "Keypad Play/Pause button"
+    },
+    "simulate_prev_button": {
+      "description": "Simulate pressing zone keypad Prev button.",
+      "fields": {
+        "entity_id": {
+          "description": "entity_id of media player zone to send the button press from.",
+          "example": "media_player.living_room",
+          "name": "Entity ID"
+        }
+      },
+      "name": "Keypad Prev button"
+    },
+    "snapshot": {
+      "description": "Take a snapshot of the current state of a media player zone.",
+      "fields": {
+        "entity_id": {
+          "description": "entity_id(s) of media_player zone to snapshot.",
+          "example": "media_player.living_room",
+          "name": "Entity ID"
+        }
+      },
+      "name": "Snapshot"
     }
   }
 }

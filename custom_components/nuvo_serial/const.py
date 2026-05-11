@@ -38,8 +38,13 @@ SERVICE_SIMULATE_PLAY_PAUSE = "simulate_play_pause_button"
 SERVICE_SIMULATE_PREV = "simulate_prev_button"
 SERVICE_SIMULATE_NEXT = "simulate_next_button"
 SERVICE_CONFIGURE_TIME = "configure_time"
+SERVICE_SET_SOURCE_DISPLAY = "set_source_display"
 
 SERVICE_ATTR_DATETIME = "datetime"
+SERVICE_ATTR_LINE1 = "line1"
+SERVICE_ATTR_LINE2 = "line2"
+SERVICE_ATTR_LINE3 = "line3"
+SERVICE_ATTR_LINE4 = "line4"
 
 SPEAKER_GROUP_JOIN = f"{DOMAIN}_speaker_group_join"
 SPEAKER_GROUP_MEMBER_LIST_JOINED = f"{DOMAIN}_speaker_group_update_member_list_joined"

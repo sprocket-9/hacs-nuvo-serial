@@ -3,32 +3,17 @@
 import logging
 
 from nuvo_serial import get_nuvo_async
-from nuvo_serial.const import MODEL_GC
-from nuvo_serial.grand_concerto_essentia_g import NuvoAsync
-import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import ATTR_DEVICE_ID, CONF_PORT, CONF_TYPE, Platform
-from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
-from homeassistant.helpers import config_validation as cv, device_registry as dr
+from homeassistant.const import CONF_PORT, CONF_TYPE, Platform
+from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import device_registry as dr
 
-from .const import (
-    COMMAND_RESPONSE_TIMEOUT,
-    DOMAIN,
-    NUVO_OBJECT,
-    SERVICE_ATTR_DATETIME,
-    SERVICE_CONFIGURE_TIME,
-)
+from .const import COMMAND_RESPONSE_TIMEOUT, DOMAIN, NUVO_OBJECT
+from .services import async_setup_services, async_unload_services
 
 PLATFORMS = [Platform.BUTTON, Platform.MEDIA_PLAYER, Platform.NUMBER, Platform.SWITCH]
-
-CONFIGURE_TIME_SCHEMA = vol.Schema(
-    {
-        vol.Required(ATTR_DEVICE_ID): str,
-        vol.Required(SERVICE_ATTR_DATETIME): cv.datetime,
-    }
-)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -47,6 +32,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     entry.async_on_unload(entry.add_update_listener(_update_listener))
 
+    entry.runtime_data = nuvo
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {NUVO_OBJECT: nuvo}
 
     version = await nuvo.get_version()
@@ -65,38 +51,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    def nuvo_connection(func):
-        """Decorate a service call func with the nuvo connection associated with a service call device_id.
-
-        If there are multiple nuvo_serial integrations installed this ensures the
-        service call is made to the correct system.
-        """
-
-        async def get_nuvo_object_from_device_id(call: ServiceCall):
-            nuvo_object = None
-            device_id = call.data[ATTR_DEVICE_ID]
-            if device := device_registry.async_get(device_id):
-                for config_entry_id in device.config_entries:
-                    if data := hass.data[DOMAIN].get(config_entry_id):
-                        if nuvo_object := data.get(NUVO_OBJECT):
-                            break
-            if nuvo_object is None:
-                raise HomeAssistantError(
-                    f"Nuvo connection not found for device_id: {call.data[ATTR_DEVICE_ID]}"
-                )
-            await func(call, nuvo_object)
-
-        return get_nuvo_object_from_device_id
-
-    @nuvo_connection
-    async def configure_time(call: ServiceCall, connection: NuvoAsync) -> None:
-        """Service call to set the system time."""
-        await connection.configure_time(call.data[SERVICE_ATTR_DATETIME])
-
-    if model == MODEL_GC:
-        hass.services.async_register(
-            DOMAIN, SERVICE_CONFIGURE_TIME, configure_time, schema=CONFIGURE_TIME_SCHEMA
-        )
+    async_setup_services(hass, model)
 
     return True
 
@@ -111,6 +66,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok:
         hass.data[DOMAIN][entry.entry_id][NUVO_OBJECT] = None
         hass.data[DOMAIN].pop(entry.entry_id)
+        async_unload_services(hass)
 
     return unload_ok
 
