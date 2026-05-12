@@ -4,7 +4,7 @@
   "documentation": "https://github.com/sprocket-9/hacs-nuvo-serial/blob/main/README.md",
   "issue_tracker": "https://github.com/sprocket-9/hacs-nuvo-serial/issues",
   "integration_type": "hub",
-  "requirements": ["nuvo-serial==0.5.3"],
+  "requirements": ["nuvo-serial==0.6.3"],
   "codeowners": ["@sprocket-9"],
   "config_flow": true,
   "quality_scale": "silver",
