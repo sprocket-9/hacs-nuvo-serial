@@ -1,7 +1,5 @@
 """Config flow for Nuvo multi-zone amplifier integration."""
 
-from __future__ import annotations
-
 import logging
 from typing import Any
 
@@ -26,6 +24,7 @@ from homeassistant.config_entries import (
 from homeassistant.const import CONF_PORT, CONF_TYPE
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import AbortFlow
+from homeassistant.helpers.selector import SerialPortSelector
 
 from .const import COMMAND_RESPONSE_TIMEOUT, CONF_SOURCES, CONF_ZONES, DOMAIN
 
@@ -33,7 +32,10 @@ _LOGGER = logging.getLogger(__name__)
 
 models = {" ".join(model.split("_")): model for model in config}
 DATA_SCHEMA = vol.Schema(
-    {vol.Required(CONF_PORT): str, vol.Required(CONF_TYPE): vol.In(models.keys())}
+    {
+        vol.Required(CONF_PORT): SerialPortSelector(),
+        vol.Required(CONF_TYPE): vol.In(models.keys()),
+    }
 )
 
 
@@ -259,7 +261,7 @@ class NuvoOptionsFlowHandler(OptionsFlow):
 
     def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialize."""
-        self.config_entry = config_entry
+        self._config_entry = config_entry
         self._data: dict[str, Any] = {}
         self._nuvo: NuvoAsync
         self._port_changed = False
@@ -268,10 +270,10 @@ class NuvoOptionsFlowHandler(OptionsFlow):
     def _previous_sources(self) -> dict[str, str]:
         """Get current sources."""
         previous: dict[str, str]
-        if CONF_SOURCES in self.config_entry.options:
-            previous = self.config_entry.options[CONF_SOURCES]
+        if CONF_SOURCES in self._config_entry.options:
+            previous = self._config_entry.options[CONF_SOURCES]
         else:
-            previous = self.config_entry.data[CONF_SOURCES]
+            previous = self._config_entry.data[CONF_SOURCES]
 
         return previous
 
@@ -286,7 +288,7 @@ class NuvoOptionsFlowHandler(OptionsFlow):
     ) -> ConfigFlowResult:
         """Handle serial port change."""
 
-        current_port = self.config_entry.data[CONF_PORT]
+        current_port = self._config_entry.data[CONF_PORT]
         form_port = current_port
         errors: dict[str, str] = {}
 
@@ -303,7 +305,7 @@ class NuvoOptionsFlowHandler(OptionsFlow):
                 try:
                     self._nuvo = await get_nuvo_async(
                         _port,
-                        self.config_entry.data[CONF_TYPE],
+                        self._config_entry.data[CONF_TYPE],
                         timeout=COMMAND_RESPONSE_TIMEOUT,
                     )
                 except SerialException:
@@ -325,7 +327,9 @@ class NuvoOptionsFlowHandler(OptionsFlow):
                 self._data[CONF_PORT] = _port
                 return await self.async_step_sources()
 
-        schema = vol.Schema({vol.Required(CONF_PORT, default=form_port): str})
+        schema = vol.Schema(
+            {vol.Required(CONF_PORT, default=form_port): SerialPortSelector()}
+        )
         return self.async_show_form(step_id="port", data_schema=schema, errors=errors)
 
     async def async_step_sources(
