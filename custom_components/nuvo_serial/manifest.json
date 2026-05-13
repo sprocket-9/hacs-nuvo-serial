@@ -5,6 +5,7 @@
   "issue_tracker": "https://github.com/sprocket-9/hacs-nuvo-serial/issues",
   "integration_type": "hub",
   "requirements": ["nuvo-serial==0.6.4"],
+  "after_dependencies": ["usb"],
   "codeowners": ["@sprocket-9"],
   "config_flow": true,
   "quality_scale": "silver",
