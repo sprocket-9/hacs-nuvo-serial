@@ -25,8 +25,12 @@ from .const import (
     SERVICE_ATTR_LINE2,
     SERVICE_ATTR_LINE3,
     SERVICE_ATTR_LINE4,
+    SERVICE_ATTR_STATUS,
+    SERVICE_ATTR_TRACK_DURATION,
+    SERVICE_ATTR_TRACK_POSITION,
     SERVICE_CONFIGURE_TIME,
     SERVICE_SET_SOURCE_DISPLAY,
+    SERVICE_SET_SOURCE_TRACK,
 )
 
 CONFIGURE_TIME_SCHEMA = vol.Schema(
@@ -43,6 +47,18 @@ _SOURCE_DISPLAY_LINES = (
     SERVICE_ATTR_LINE4,
 )
 
+_SOURCE_TRACK_STATUSES = {
+    "normal": 0,
+    "idle": 1,
+    "playing": 2,
+    "paused": 3,
+    "fast forward": 4,
+    "rewind": 5,
+    "play shuffle": 6,
+    "play repeat": 7,
+    "play shuffle repeat": 8,
+}
+
 
 def _windows_1252(value: str) -> str:
     """Validate the value can be encoded as Windows-1252."""
@@ -58,6 +74,21 @@ def _has_source_display_line(data: dict[str, Any]) -> dict[str, Any]:
     if not any(line in data for line in _SOURCE_DISPLAY_LINES):
         raise vol.Invalid("at least one display line must be supplied")
     return data
+
+
+def _track_position_within_duration(data: dict[str, Any]) -> dict[str, Any]:
+    """Validate the track position is within the track duration."""
+    if data[SERVICE_ATTR_TRACK_POSITION] > data[SERVICE_ATTR_TRACK_DURATION]:
+        raise vol.Invalid("track position must not exceed track duration")
+    return data
+
+
+def _source_track_status(value: str) -> int:
+    """Convert a source track status text value to its integer code."""
+    try:
+        return _SOURCE_TRACK_STATUSES[value.lower()]
+    except KeyError as err:
+        raise vol.Invalid("invalid source track status") from err
 
 
 def _source_id_from_device_id(
@@ -104,6 +135,25 @@ SET_SOURCE_DISPLAY_SCHEMA = vol.All(
         }
     ),
     _has_source_display_line,
+)
+
+SET_SOURCE_TRACK_SCHEMA = vol.All(
+    vol.Schema(
+        {
+            vol.Required(ATTR_DEVICE_ID): str,
+            vol.Required(SERVICE_ATTR_TRACK_DURATION): vol.All(
+                vol.Coerce(int), vol.Range(min=0)
+            ),
+            vol.Required(SERVICE_ATTR_TRACK_POSITION): vol.All(
+                vol.Coerce(int), vol.Range(min=0)
+            ),
+            vol.Required(SERVICE_ATTR_STATUS): vol.Any(
+                vol.All(vol.Coerce(int), vol.Range(min=0, max=8)),
+                _source_track_status,
+            ),
+        }
+    ),
+    _track_position_within_duration,
 )
 
 
@@ -167,6 +217,22 @@ def async_setup_services(hass: HomeAssistant, model: str) -> None:
                     source, line_number, call.data[line]
                 )
 
+    async def set_source_track(call: ServiceCall) -> None:
+        """Service call to set source track information."""
+        device_id = call.data[ATTR_DEVICE_ID]
+        _entry, connection = _get_nuvo_entry_from_device_id(
+            hass, device_registry, device_id
+        )
+        source = _source_id_from_device_id(device_registry, device_id)
+        if _is_nuvonet_source_enabled(hass, entity_registry, device_id, source):
+            raise HomeAssistantError("Nuvonet sources manage their own display")
+        await connection.set_source_display_track(
+            source,
+            call.data[SERVICE_ATTR_TRACK_DURATION],
+            call.data[SERVICE_ATTR_TRACK_POSITION],
+            call.data[SERVICE_ATTR_STATUS],
+        )
+
     if model == MODEL_GC and not hass.services.has_service(
         DOMAIN, SERVICE_CONFIGURE_TIME
     ):
@@ -182,6 +248,14 @@ def async_setup_services(hass: HomeAssistant, model: str) -> None:
             schema=SET_SOURCE_DISPLAY_SCHEMA,
         )
 
+    if not hass.services.has_service(DOMAIN, SERVICE_SET_SOURCE_TRACK):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_SET_SOURCE_TRACK,
+            set_source_track,
+            schema=SET_SOURCE_TRACK_SCHEMA,
+        )
+
 
 @callback
 def async_unload_services(hass: HomeAssistant) -> None:
@@ -190,6 +264,11 @@ def async_unload_services(hass: HomeAssistant) -> None:
         DOMAIN, SERVICE_SET_SOURCE_DISPLAY
     ):
         hass.services.async_remove(DOMAIN, SERVICE_SET_SOURCE_DISPLAY)
+
+    if not hass.data.get(DOMAIN) and hass.services.has_service(
+        DOMAIN, SERVICE_SET_SOURCE_TRACK
+    ):
+        hass.services.async_remove(DOMAIN, SERVICE_SET_SOURCE_TRACK)
 
     if not _has_grand_concerto_entry(hass) and hass.services.has_service(
         DOMAIN, SERVICE_CONFIGURE_TIME

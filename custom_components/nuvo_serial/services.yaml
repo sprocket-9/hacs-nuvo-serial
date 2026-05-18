@@ -38,6 +38,42 @@ set_source_display:
       selector:
         text:
 
+set_source_track:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          filter:
+            integration: "nuvo_serial"
+            model: "Source"
+    track_duration:
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    track_position:
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    status:
+      required: true
+      selector:
+        select:
+          options:
+            - "Normal"
+            - "Idle"
+            - "Playing"
+            - "Paused"
+            - "Fast Forward"
+            - "Rewind"
+            - "Play Shuffle"
+            - "Play Repeat"
+            - "Play Shuffle Repeat"
+
 snapshot:
   fields:
     entity_id:

@@ -15,6 +15,9 @@
     "set_source_display": {
       "service": "mdi:format-list-bulleted"
     },
+    "set_source_track": {
+      "service": "mdi:format-list-bulleted"
+    },
     "simulate_next_button": {
       "service": "mdi:skip-next"
     },

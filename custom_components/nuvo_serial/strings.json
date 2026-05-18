@@ -171,6 +171,31 @@
       },
       "name": "Set source display lines"
     },
+    "set_source_track": {
+      "description": "Set track information for a Nuvo source display.",
+      "fields": {
+        "device_id": {
+          "description": "The device to send the service call to.",
+          "name": "Device ID"
+        },
+        "status": {
+          "description": "The track playback status. Accepts Normal, Idle, Playing, Paused, Fast Forward, Rewind, Play Shuffle, Play Repeat, Play Shuffle Repeat, or status number 0-8.",
+          "example": "Playing",
+          "name": "Status"
+        },
+        "track_duration": {
+          "description": "The total track duration in tenths of seconds.",
+          "example": "3000",
+          "name": "Track duration"
+        },
+        "track_position": {
+          "description": "The current track position in tenths of seconds.",
+          "example": "420",
+          "name": "Track position"
+        }
+      },
+      "name": "Set source track information"
+    },
     "simulate_next_button": {
       "description": "Simulate pressing zone keypad Next button.",
       "fields": {
