@@ -26,7 +26,7 @@ from homeassistant.components.media_player import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_ENTITY_ID, CONF_PORT, CONF_TYPE
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant
-from homeassistant.helpers import entity_platform
+from homeassistant.helpers import device_registry as dr, entity_platform
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -66,7 +66,7 @@ async def async_setup_entry(
     model = config_entry.data[CONF_TYPE]
 
     nuvo = hass.data[DOMAIN][config_entry.entry_id][NUVO_OBJECT]
-    port = config_entry.data[CONF_PORT]
+    port = config_entry.options.get(CONF_PORT, config_entry.data[CONF_PORT])
 
     sources = get_sources(config_entry)
     zones = get_zones(config_entry)
@@ -198,7 +198,11 @@ class NuvoZone(MediaPlayerEntity):
             manufacturer=manufacturer,
             model=model,
             name=name,
-            via_device=(DOMAIN, self._port),
+            via_device_id=dr.async_get_device_id_by_identifier(
+                self.hass,
+                (DOMAIN, self._port),
+                config_entry_id=self._namespace,
+            ),
         )
 
     @property

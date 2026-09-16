@@ -28,7 +28,7 @@ async def async_setup_entry(
     """Set up the Button entities associated with each Nuvo multi-zone amplifier zone."""
 
     nuvo = hass.data[DOMAIN][config_entry.entry_id][NUVO_OBJECT]
-    port = config_entry.data[CONF_PORT]
+    port = config_entry.options.get(CONF_PORT, config_entry.data[CONF_PORT])
     entities: list[Entity] = []
 
     entities.append(NuvoButton(nuvo, port, config_entry.entry_id, "all zones off"))

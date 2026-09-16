@@ -46,7 +46,7 @@ async def async_setup_entry(
 
     model = config_entry.data[CONF_TYPE]
     nuvo = hass.data[DOMAIN][config_entry.entry_id][NUVO_OBJECT]
-    port = config_entry.data[CONF_PORT]
+    port = config_entry.options.get(CONF_PORT, config_entry.data[CONF_PORT])
     zones = get_zones(config_entry)
     sources = get_sources(config_entry)[0]
     entities: list[Entity] = []
@@ -151,7 +151,7 @@ class NuvoSwitchControl(NuvoControl, SwitchEntity):
                 return
             self._control_value = float(getattr(msg, self._control_name))
             self._available = True
-        except (KeyError, AttributeError):
+        except KeyError, AttributeError:
             _LOGGER.debug(
                 "%s %d %s: invalid %s message received",
                 self._nuvo_entity_type,

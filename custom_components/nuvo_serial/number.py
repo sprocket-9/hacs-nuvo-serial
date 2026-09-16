@@ -16,6 +16,7 @@ from homeassistant.components.number import NumberEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PORT, CONF_TYPE
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity import DeviceInfo, Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -56,7 +57,7 @@ async def async_setup_entry(
 
     model = config_entry.data[CONF_TYPE]
     nuvo = hass.data[DOMAIN][config_entry.entry_id][NUVO_OBJECT]
-    port = config_entry.data[CONF_PORT]
+    port = config_entry.options.get(CONF_PORT, config_entry.data[CONF_PORT])
     zones = get_zones(config_entry)
     sources = get_sources(config_entry)[0]
     entities: list[Entity] = []
@@ -198,7 +199,11 @@ class NuvoNumberControl(NuvoControl, NumberEntity):
                 manufacturer=manufacturer,
                 model=model,
                 name=name,
-                via_device=(DOMAIN, self._port),
+                via_device_id=dr.async_get_device_id_by_identifier(
+                    self.hass,
+                    (DOMAIN, self._port),
+                    config_entry_id=self._namespace,
+                ),
             )
         else:
             dev_info = DeviceInfo(
@@ -264,13 +269,11 @@ class NuvoNumberControl(NuvoControl, NumberEntity):
                 return
             self._control_value = float(getattr(msg, self._control_name))
             if (
-                self._control_name == "balance"
-                and msg.balance_position == "L"
-                or self._control_name in VOLUME_CONTROLS
-            ):
+                self._control_name == "balance" and msg.balance_position == "L"
+            ) or self._control_name in VOLUME_CONTROLS:
                 self._control_value = -self._control_value
             self._available = True
-        except (KeyError, AttributeError):
+        except KeyError, AttributeError:
             _LOGGER.debug(
                 "%s %d %s: invalid %s message received",
                 self._nuvo_entity_type,
